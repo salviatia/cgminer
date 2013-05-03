@@ -304,13 +304,13 @@ else
 fi
 
 AM_CONDITIONAL([NEED_FPGAUTILS], [test x$avalon$icarus$bitforce$modminer$ztex != xnonononono])
-AM_CONDITIONAL([NEED_USBUTILS_C], [test x$bitforce$modminer$bflsc != xnonono])
+AM_CONDITIONAL([NEED_USBUTILS_C], [test x$avalon$bitforce$modminer$bflsc != xnononono])
 AM_CONDITIONAL([HAVE_CURSES], [test x$curses = xyes])
 AM_CONDITIONAL([WANT_JANSSON], [test x$request_jansson = xtrue])
 AM_CONDITIONAL([HAVE_WINDOWS], [test x$have_win32 = xtrue])
 AM_CONDITIONAL([HAVE_x86_64], [test x$have_x86_64 = xtrue])
 
-if test "x$bitforce$modminer$bflsc" != xnonono; then
+if test "x$avalon$bitforce$modminer$bflsc" != xnononono; then
 	AC_DEFINE([USE_USBUTILS], [1], [Defined to 1 if usbutils support required])
 fi
 
@@ -353,7 +353,7 @@ if test "x$have_cgminer_sdk" = "xtrue"; then
 	PKG_CONFIG_PATH="$CGMINER_SDK/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 fi
 
-if test "x$ztex$modminer$bitforce$bflsc" != xnononono; then
+if test "x$avalon$ztex$modminer$bitforce$bflsc" != xnonononono; then
   case $target in
     *-*-freebsd*)
       LIBUSB_LIBS="-lusb"
