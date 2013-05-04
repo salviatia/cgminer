@@ -305,41 +305,23 @@ static bool avalon_decode_nonce(struct thr_info *thr, struct avalon_result *ar,
 
 static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 {
-#if 0
-	int read_amount = AVALON_READ_SIZE;
-	uint8_t result[AVALON_READ_SIZE];
-	struct timeval timeout = {1, 0};
-	ssize_t ret = 0, offset = 0;
-	fd_set rd;
+	char result[AVALON_READ_SIZE + 1];
+	int err, amount;
 
 	memset(result, 0, AVALON_READ_SIZE);
 	memset(ar, 0, AVALON_READ_SIZE);
-	FD_ZERO(&rd);
-	FD_SET((SOCKETTYPE)fd, &rd);
-	ret = select(fd + 1, &rd, NULL, NULL, &timeout);
-	if (unlikely(ret < 0)) {
-		applog(LOG_WARNING, "Avalon: Error %d on select in avalon_get_reset", errno);
+
+	err = usb_ftdi_read_nl(avalon, result, AVALON_READ_SIZE, &amount, C_GET_AR);
+	if (err < 0 || amount != AVALON_READ_SIZE) {
+		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", errno);
 		return;
 	}
-	if (!ret) {
-		applog(LOG_WARNING, "Avalon: Timeout on select in avalon_get_reset");
-		return;
-	}
-	do {
-		ret = read(fd, result + offset, read_amount);
-		if (unlikely(ret < 0)) {
-			applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", errno);
-			return;
-		}
-		read_amount -= ret;
-		offset += ret;
-	} while (read_amount > 0);
+
 	if (opt_debug) {
 		applog(LOG_DEBUG, "Avalon: get:");
 		hexdump((uint8_t *)result, AVALON_READ_SIZE);
 	}
-	memcpy((uint8_t *)ar, result, AVALON_READ_SIZE);
-#endif
+	memcpy(ar, result, AVALON_READ_SIZE);
 }
 
 static int avalon_reset(struct cgpu_info *avalon)
@@ -724,6 +706,7 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 	char devpath[20];
 	int this_option_offset = ++option_offset;
 	struct avalon_info *info;
+	int ret;
 
 	avalon = calloc(1, sizeof(struct cgpu_info));
 	if (unlikely(!avalon))
@@ -750,7 +733,14 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 
 	avalon->device_path = strdup(devpath);
 	add_cgpu(avalon);
-
+#if 0
+	ret = avalon_reset(avalon);
+	if (ret) {
+		/* FIXME:
+		 * avalon_close(fd);
+		 * return false; */
+	}
+#endif
 	avalon_infos = realloc(avalon_infos,
 			       sizeof(struct avalon_info *) *
 			       (total_devices + 1));
