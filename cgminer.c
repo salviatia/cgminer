@@ -7017,6 +7017,10 @@ static void *hotplug_thread(void __maybe_unused *userdata)
 			new_devices = 0;
 			new_threads = 0;
 
+#ifdef USE_AVALON
+			avalon_drv.drv_detect();
+#endif
+
 #ifdef USE_BFLSC
 			bflsc_drv.drv_detect();
 #endif
