@@ -35,6 +35,7 @@
 
 #include "elist.h"
 #include "miner.h"
+#include "usbutils.h"
 #include "fpgautils.h"
 #include "driver-avalon.h"
 #include "hexdump.c"
@@ -550,7 +551,7 @@ static void get_options(int this_option_offset, int *baud, int *miner_count,
 	}
 }
 
-static bool avalon_detect_one(const char *devpath)
+static bool avalon_detect_one_serial(const char *devpath)
 {
 	struct avalon_info *info;
 	struct avalon_result ar;
@@ -628,9 +629,54 @@ static bool avalon_detect_one(const char *devpath)
 	return true;
 }
 
-static inline void avalon_detect()
+static inline void avalon_detect_serial(void)
 {
-	serial_detect(&avalon_drv, avalon_detect_one);
+	serial_detect(&avalon_drv, avalon_detect_one_serial);
+}
+
+static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found)
+{
+	int baud, miner_count, asic_count, timeout, frequency = 0;
+	struct cgpu_info *avalon;
+	char devpath[20];
+	int this_option_offset = ++option_offset;
+
+	avalon = calloc(1, sizeof(struct cgpu_info));
+	if (unlikely(!avalon))
+		quit(1, "Failed to calloc avalon in avalon_detect_one");;
+	avalon->drv = &avalon_drv;
+	avalon->threads = AVALON_MINER_THREADS;
+
+	get_options(this_option_offset, &baud, &miner_count, &asic_count,
+		    &timeout, &frequency);
+
+	if (!usb_init(avalon, dev, found))
+		return false;
+
+	/* We have a real Avalon! */
+	sprintf(devpath, "%d:%d",
+			(int)(avalon->usbinfo.bus_number),
+			(int)(avalon->usbinfo.device_address));
+
+	applog(LOG_DEBUG, "Avalon Detected: %s "
+	       "(miner_count=%d asic_count=%d timeout=%d frequency=%d)",
+	       devpath, miner_count, asic_count, timeout, frequency);
+
+	avalon->device_path = strdup(devpath);
+	add_cgpu(avalon);
+
+	avalon_infos[avalon->device_id] = calloc(sizeof(struct avalon_info), 1);
+	if (unlikely(!(avalon_infos[avalon->device_id])))
+		quit(1, "Failed to malloc avalon_infos");
+
+	/* FIXME do stuff */
+	quit(0, "Finished detection successfully");
+	return true;
+}
+
+static void avalon_detect(void)
+{
+	usb_detect(&avalon_drv, avalon_detect_one);
 }
 
 static void __avalon_init(struct cgpu_info *avalon)
