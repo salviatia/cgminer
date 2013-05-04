@@ -305,13 +305,13 @@ static bool avalon_decode_nonce(struct thr_info *thr, struct avalon_result *ar,
 
 static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 {
-	char result[AVALON_READ_SIZE + 1];
+	char result[AVALON_READ_SIZE];
 	int err, amount;
 
 	memset(result, 0, AVALON_READ_SIZE);
 	memset(ar, 0, AVALON_READ_SIZE);
 
-	err = usb_ftdi_read_nl(avalon, result, AVALON_READ_SIZE, &amount, C_GET_AR);
+	err = usb_read(avalon, result, AVALON_READ_SIZE, &amount, C_GET_AR);
 	if (err < 0 || amount != AVALON_READ_SIZE) {
 		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", errno);
 		return;
