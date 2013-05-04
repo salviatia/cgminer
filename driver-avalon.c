@@ -640,6 +640,7 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 	struct cgpu_info *avalon;
 	char devpath[20];
 	int this_option_offset = ++option_offset;
+	struct avalon_info *info;
 
 	avalon = calloc(1, sizeof(struct cgpu_info));
 	if (unlikely(!avalon))
@@ -665,11 +666,38 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 	avalon->device_path = strdup(devpath);
 	add_cgpu(avalon);
 
-	avalon_infos[avalon->device_id] = calloc(sizeof(struct avalon_info), 1);
-	if (unlikely(!(avalon_infos[avalon->device_id])))
+	avalon_infos = realloc(avalon_infos,
+			       sizeof(struct avalon_info *) *
+			       (total_devices + 1));
+	if (unlikely(!avalon_infos))
 		quit(1, "Failed to malloc avalon_infos");
 
+	avalon_infos[avalon->device_id] = calloc(sizeof(struct avalon_info), 1);
+	if (unlikely(!(avalon_infos[avalon->device_id])))
+		quit(1, "Failed to malloc avalon_infos device");
+	info = avalon_infos[avalon->device_id];
+
 	/* FIXME do stuff */
+
+	info->miner_count = miner_count;
+	info->asic_count = asic_count;
+	info->timeout = timeout;
+
+	info->fan_pwm = AVALON_DEFAULT_FAN_MIN_PWM;
+	info->temp_max = 0;
+	/* This is for check the temp/fan every 3~4s */
+	info->temp_history_count = (4 / (float)((float)info->timeout * ((float)1.67/0x32))) + 1;
+	if (info->temp_history_count <= 0)
+		info->temp_history_count = 1;
+
+	info->temp_history_index = 0;
+	info->temp_sum = 0;
+	info->temp_old = 0;
+	info->frequency = frequency;
+
+	/* Set asic to idle mode after detect */
+	avalon_idle(avalon);
+
 	quit(0, "Finished detection successfully");
 	return true;
 }
