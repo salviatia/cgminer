@@ -136,9 +136,9 @@ enum usb_cmds {
 	C_QUEFLUSH,
 	C_QUEFLUSHREPLY,
 	C_REQUESTVOLTS,
-	C_MAX,
 	C_AVALON_TASK,
-	C_GET_AR
+	C_GET_AR,
+	C_MAX
 };
 
 struct device_drv;
