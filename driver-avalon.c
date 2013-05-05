@@ -207,66 +207,51 @@ static int avalon_send_task(const struct avalon_task *at,
 	return AVA_SEND_BUFFER_EMPTY;
 }
 
-static inline int avalon_gets(int fd, uint8_t *buf, struct thr_info *thr,
-		       struct timeval *tv_finish)
+static inline int
+avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
+	    struct timeval *tv_finish)
 {
 	int read_amount = AVALON_READ_SIZE;
 	bool first = true;
-	ssize_t ret = 0;
+	int ret, err;
 
 	while (true) {
-		struct timeval timeout;
-		fd_set rd;
-
 		if (unlikely(thr->work_restart)) {
 			applog(LOG_DEBUG, "Avalon: Work restart");
 			return AVA_GETS_RESTART;
 		}
 
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 100000;
-
-		FD_ZERO(&rd);
-		FD_SET((SOCKETTYPE)fd, &rd);
-		ret = select(fd + 1, &rd, NULL, NULL, &timeout);
-		if (unlikely(ret < 0)) {
-			applog(LOG_ERR, "Avalon: Error %d on select in avalon_gets", errno);
+		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
+					    100, C_GET_AR);
+		if (err == LIBUSB_ERROR_TIMEOUT) {
+			err = 0;
+			if (!ret)
+				return AVA_GETS_TIMEOUT;
+		}
+		if (err) {
+			applog(LOG_ERR, "Avalon: Error %d on usb read in avalon_gets", err);
 			return AVA_GETS_ERROR;
 		}
-		if (ret) {
-			ret = read(fd, buf, read_amount);
-			if (unlikely(ret < 0)) {
-				applog(LOG_ERR, "Avalon: Error %d on read in avalon_gets", errno);
-				return AVA_GETS_ERROR;
-			}
-			if (likely(first)) {
-				cgtime(tv_finish);
-				first = false;
-			}
-			if (likely(ret >= read_amount))
-				return AVA_GETS_OK;
-			buf += ret;
-			read_amount -= ret;
-			continue;
-		}
 
-		if (unlikely(thr->work_restart)) {
-			applog(LOG_DEBUG, "Avalon: Work restart");
-			return AVA_GETS_RESTART;
+		if (likely(first)) {
+			cgtime(tv_finish);
+			first = false;
 		}
-
-		return AVA_GETS_TIMEOUT;
+		if (likely(ret >= read_amount))
+			return AVA_GETS_OK;
+		buf += ret;
+		read_amount -= ret;
 	}
 }
 
-static int avalon_get_result(int fd, struct avalon_result *ar,
+static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			     struct thr_info *thr, struct timeval *tv_finish)
 {
 	uint8_t result[AVALON_READ_SIZE];
 	int ret;
 
 	memset(result, 0, AVALON_READ_SIZE);
-	ret = avalon_gets(fd, result, thr, tv_finish);
+	ret = avalon_gets(avalon, result, thr, tv_finish);
 
 	if (ret == AVA_GETS_OK) {
 		if (opt_debug) {
@@ -937,7 +922,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 {
 	struct cgpu_info *avalon;
 	struct work **works;
-	int fd = 0, ret = AVA_GETS_OK, full;
+	int ret = AVA_GETS_OK, full;
 
 	struct avalon_info *info;
 	struct avalon_task at;
@@ -1017,13 +1002,14 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	result_wrong = 0;
 	hash_count = 0;
 	while (true) {
+#if 0
 		full = avalon_buffer_full(fd);
 		applog(LOG_DEBUG, "Avalon: Buffer full: %s",
 		       ((full == AVA_BUFFER_FULL) ? "Yes" : "No"));
 		if (unlikely(full == AVA_BUFFER_EMPTY))
 			break;
-
-		ret = avalon_get_result(fd, &ar, thr, &tv_finish);
+#endif
+		ret = avalon_get_result(avalon, &ar, thr, &tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
 			do_avalon_close(thr);
 			applog(LOG_ERR,
