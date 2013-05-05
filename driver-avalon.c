@@ -733,14 +733,14 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 
 	avalon->device_path = strdup(devpath);
 	add_cgpu(avalon);
-#if 0
+
 	ret = avalon_reset(avalon);
 	if (ret) {
 		/* FIXME:
 		 * avalon_close(fd);
 		 * return false; */
 	}
-#endif
+
 	avalon_infos = realloc(avalon_infos,
 			       sizeof(struct avalon_info *) *
 			       (total_devices + 1));
@@ -788,6 +788,7 @@ static void __avalon_init(struct cgpu_info *avalon)
 
 static void avalon_init(struct cgpu_info *avalon)
 {
+#if 0
 	int fd, ret;
 
 	avalon->device_fd = -1;
@@ -806,6 +807,7 @@ static void avalon_init(struct cgpu_info *avalon)
 	}
 
 	avalon->device_fd = fd;
+#endif
 	__avalon_init(avalon);
 }
 
@@ -820,10 +822,12 @@ static bool avalon_prepare(struct thr_info *thr)
 			       AVALON_ARRAY_SIZE);
 	if (!avalon->works)
 		quit(1, "Failed to calloc avalon works in avalon_prepare");
+#if 0
 	if (avalon->device_fd == -1)
 		avalon_init(avalon);
 	else
 		__avalon_init(avalon);
+#endif
 
 	cgtime(&now);
 	get_datestamp(avalon->init, &now);
@@ -861,8 +865,7 @@ static void do_avalon_close(struct thr_info *thr)
 	sleep(1);
 	avalon_reset(avalon);
 	avalon_idle(avalon);
-	avalon_close(avalon->device_fd);
-	avalon->device_fd = -1;
+	//avalon_close(avalon->device_fd);
 
 	info->no_matching_work = 0;
 }
@@ -951,7 +954,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 {
 	struct cgpu_info *avalon;
 	struct work **works;
-	int fd, ret = AVA_GETS_OK, full;
+	int fd = 0, ret = AVA_GETS_OK, full;
 
 	struct avalon_info *info;
 	struct avalon_task at;
@@ -971,6 +974,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	info = avalon_infos[avalon->device_id];
 	avalon_get_work_count = info->miner_count;
 
+#if 0
 	if (unlikely(avalon->device_fd == -1)) {
 		if (!avalon_prepare(thr)) {
 			applog(LOG_ERR, "AVA%i: Comms error(open)",
@@ -983,6 +987,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	fd = avalon->device_fd;
 #ifndef WIN32
 	tcflush(fd, TCOFLUSH);
+#endif
 #endif
 
 	start_count = avalon->work_array * avalon_get_work_count;

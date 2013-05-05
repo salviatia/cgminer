@@ -424,7 +424,7 @@ struct cgpu_info {
 #ifdef USE_USBUTILS
 		struct cg_usb_device *usbdev;
 #endif
-#if defined(USE_ICARUS) || defined(USE_AVALON)
+#if defined(USE_ICARUS)
 		int device_fd;
 #endif
 	};
