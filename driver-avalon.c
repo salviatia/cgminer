@@ -314,7 +314,7 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	err = usb_ftdi_read(avalon, result, AVALON_READ_SIZE, &amount, C_GET_AR);
 	if (err < 0 || amount != AVALON_READ_SIZE) {
 		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", errno);
-		applog(LOG_WARNING, "Avalon: Asked for %d, got %d",
+		applog(LOG_WARNING, "Avalon: USB read asked for %d, got %d",
 		       AVALON_READ_SIZE, amount);
 		return;
 	}
