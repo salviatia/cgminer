@@ -316,6 +316,10 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", errno);
 		applog(LOG_WARNING, "Avalon: USB read asked for %d, got %d",
 		       AVALON_READ_SIZE, amount);
+		if (opt_debug && amount) {
+			applog(LOG_DEBUG, "Avalon: got:");
+			hexdump((uint8_t *)result, amount);
+		}
 		return;
 	}
 
