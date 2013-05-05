@@ -1913,8 +1913,18 @@ int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *pro
 
 			tot += got;
 
-			if (err || readonce)
+			if (readonce)
 				break;
+			if (err) {
+				/* Don't use overflow as an error, simply
+				 * retrieve what information we want and break
+				 * out. */
+				if (err != LIBUSB_ERROR_OVERFLOW)
+					break;
+				err = 0;
+				if (tot >= (int)bufsiz)
+					break;
+			}
 
 			ptr += got;
 			bufleft -= got;
