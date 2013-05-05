@@ -138,6 +138,7 @@ enum usb_cmds {
 	C_REQUESTVOLTS,
 	C_AVALON_TASK,
 	C_GET_AR,
+	C_FTDI_STATUS,
 	C_MAX
 };
 
@@ -153,6 +154,7 @@ void usb_detect(struct device_drv *drv, bool (*device_detect)(struct libusb_devi
 struct api_data *api_usb_stats(int *count);
 void update_usb_stats(struct cgpu_info *cgpu);
 int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *processed, unsigned int timeout, const char *end, enum usb_cmds cmd, bool ftdi, bool readonce);
+int usb_ftdi_cts(struct cgpu_info *cgpu);
 int _usb_write(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *processed, unsigned int timeout, enum usb_cmds);
 int _usb_transfer(struct cgpu_info *cgpu, uint8_t request_type, uint8_t bRequest, uint16_t wValue, uint16_t wIndex, unsigned int timeout, enum usb_cmds cmd);
 void usb_cleanup();

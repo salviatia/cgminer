@@ -134,6 +134,7 @@ static int avalon_send_task(const struct avalon_task *at,
 	uint64_t delay = 32000000; /* Default 32ms for B19200 */
 	uint32_t nonce_range;
 	int i, amount = 0;
+	bool full;
 
 	if (at->nonce_elf)
 		nr_len = AVALON_WRITE_SIZE + 4 * at->asic_num;
@@ -195,14 +196,13 @@ static int avalon_send_task(const struct avalon_task *at,
 	p.tv_nsec = (long)delay + 4000000;
 	nanosleep(&p, NULL);
 	applog(LOG_DEBUG, "Avalon: Sent: Buffer delay: %ld", p.tv_nsec);
-#if 0
-	full = avalon_buffer_full(fd);
+
+	full = avalon_buffer_full(avalon);
 	applog(LOG_DEBUG, "Avalon: Sent: Buffer full: %s",
 	       ((full == AVA_BUFFER_FULL) ? "Yes" : "No"));
 
 	if (unlikely(full == AVA_BUFFER_FULL))
 		return AVA_SEND_BUFFER_FULL;
-#endif
 
 	return AVA_SEND_BUFFER_EMPTY;
 }
@@ -1002,13 +1002,12 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	result_wrong = 0;
 	hash_count = 0;
 	while (true) {
-#if 0
-		full = avalon_buffer_full(fd);
+		full = avalon_buffer_full(avalon);
 		applog(LOG_DEBUG, "Avalon: Buffer full: %s",
 		       ((full == AVA_BUFFER_FULL) ? "Yes" : "No"));
 		if (unlikely(full == AVA_BUFFER_EMPTY))
 			break;
-#endif
+
 		ret = avalon_get_result(avalon, &ar, thr, &tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
 			do_avalon_close(thr);

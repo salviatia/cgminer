@@ -323,6 +323,7 @@ static const char *C_QUEFLUSHREPLY_S = "QueFlushReply";
 static const char *C_REQUESTVOLTS_S = "RequestVolts";
 static const char *C_AVALON_TASK_S = "AvalonTask";
 static const char *C_GET_AR_S = "AvalonResult";
+static const char *C_FTDI_STATUS_S = "FTDIStatus";
 
 #ifdef EOL
 #undef EOL
@@ -793,6 +794,7 @@ static void cgusb_check_init()
 		usb_commands[C_REQUESTVOLTS] = C_REQUESTVOLTS_S;
 		usb_commands[C_AVALON_TASK] = C_AVALON_TASK_S;
 		usb_commands[C_GET_AR] = C_GET_AR_S;
+		usb_commands[C_FTDI_STATUS] = C_FTDI_STATUS_S;
 
 		stats_initialised = true;
 	}
@@ -1840,7 +1842,6 @@ static void rejected_inc(struct cgpu_info *cgpu)
 #endif
 
 #define USB_MAX_READ 8192
-
 int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *processed, unsigned int timeout, const char *end, enum usb_cmds cmd, bool ftdi, bool readonce)
 {
 	struct cg_usb_device *usbdev = cgpu->usbdev;
@@ -2026,6 +2027,23 @@ int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *pro
 		release_cgpu(cgpu);
 
 	return err;
+}
+
+#define FTDI_STATUS_B0_MASK     (FTDI_RS0_CTS | FTDI_RS0_DSR | FTDI_RS0_RI | FTDI_RS0_RLSD)
+#define FTDI_RS0_CTS    (1 << 4)
+#define FTDI_RS0_DSR    (1 << 5)
+#define FTDI_RS0_RI     (1 << 6)
+#define FTDI_RS0_RLSD   (1 << 7)
+
+int usb_ftdi_cts(struct cgpu_info *cgpu)
+{
+	char buf[2], ret;
+	int amount;
+
+	_usb_read(cgpu, DEFAULT_EP_IN, buf, 2, &amount, DEVTIMEOUT, NULL,
+		  C_FTDI_STATUS, false, true);
+	ret = buf[0] & FTDI_STATUS_B0_MASK;
+	return (ret & FTDI_RS0_CTS);
 }
 
 int _usb_write(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *processed, unsigned int timeout, enum usb_cmds cmd)
