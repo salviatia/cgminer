@@ -778,7 +778,6 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 	/* Set asic to idle mode after detect */
 	avalon_idle(avalon);
 
-	quit(0, "Finished detection successfully");
 	return true;
 }
 
@@ -794,26 +793,7 @@ static void __avalon_init(struct cgpu_info *avalon)
 
 static void avalon_init(struct cgpu_info *avalon)
 {
-#if 0
-	int fd, ret;
-
-	avalon->device_fd = -1;
-	fd = avalon_open(avalon->device_path,
-			     avalon_infos[avalon->device_id]->baud);
-	if (unlikely(fd == -1)) {
-		applog(LOG_ERR, "Avalon: Failed to open on %s",
-		       avalon->device_path);
-		return;
-	}
-
-	ret = avalon_reset(avalon);
-	if (ret) {
-		avalon_close(fd);
-		return;
-	}
-
-	avalon->device_fd = fd;
-#endif
+	avalon_reset(avalon);
 	__avalon_init(avalon);
 }
 
@@ -828,12 +808,8 @@ static bool avalon_prepare(struct thr_info *thr)
 			       AVALON_ARRAY_SIZE);
 	if (!avalon->works)
 		quit(1, "Failed to calloc avalon works in avalon_prepare");
-#if 0
-	if (avalon->device_fd == -1)
-		avalon_init(avalon);
-	else
-		__avalon_init(avalon);
-#endif
+
+	avalon_init(avalon);
 
 	cgtime(&now);
 	get_datestamp(avalon->init, &now);
