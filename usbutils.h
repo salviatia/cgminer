@@ -25,11 +25,11 @@
 #define FTDI_VALUE_PURGE_RX 1
 #define FTDI_VALUE_PURGE_TX 2
 
-// baud with a 0 divisor is 120,000,000/10
-//#define FTDI_VALUE_BAUD (0)
-//#define FTDI_INDEX_BAUD (0)
-#define FTDI_VALUE_BAUD 0xc068
-#define FTDI_INDEX_BAUD 0x0200
+/* Different values and index for encoded baud for 232H and 232R chips */
+#define FTDIH_VALUE_BAUD 0xc068
+#define FTDIH_INDEX_BAUD 0x0200
+#define FTDIR_VALUE_BAUD 0x001A
+#define FTDIR_INDEX_BAUD 0x0000
 
 #define FTDI_VALUE_DATA 0
 #define FTDI_VALUE_FLOW 0

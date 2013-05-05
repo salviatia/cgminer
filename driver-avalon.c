@@ -657,8 +657,8 @@ static void avalon_initialise(struct cgpu_info *avalon)
 		return;
 
 	// Set the baud
-	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_BAUD, FTDI_VALUE_BAUD,
-				(FTDI_INDEX_BAUD & 0xff00) | avalon->usbdev->found->interface,
+	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_BAUD, FTDIR_VALUE_BAUD,
+				(FTDIR_INDEX_BAUD & 0xff00) | avalon->usbdev->found->interface,
 				C_SETBAUD);
 
 	applog(LOG_DEBUG, "%s%i: setbaud got err %d",

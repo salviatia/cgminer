@@ -597,8 +597,8 @@ static void __bflsc_initialise(struct cgpu_info *bflsc)
 		return;
 
 	// Set the baud
-	err = usb_transfer(bflsc, FTDI_TYPE_OUT, FTDI_REQUEST_BAUD, FTDI_VALUE_BAUD,
-				(FTDI_INDEX_BAUD & 0xff00) | bflsc->usbdev->found->interface,
+	err = usb_transfer(bflsc, FTDI_TYPE_OUT, FTDI_REQUEST_BAUD, FTDIH_VALUE_BAUD,
+				(FTDIH_INDEX_BAUD & 0xff00) | bflsc->usbdev->found->interface,
 				C_SETBAUD);
 
 	applog(LOG_DEBUG, "%s%i: setbaud got err %d",
