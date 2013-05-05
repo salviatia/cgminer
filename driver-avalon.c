@@ -311,9 +311,11 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	memset(result, 0, AVALON_READ_SIZE);
 	memset(ar, 0, AVALON_READ_SIZE);
 
-	err = usb_read(avalon, result, AVALON_READ_SIZE, &amount, C_GET_AR);
+	err = usb_ftdi_read(avalon, result, AVALON_READ_SIZE, &amount, C_GET_AR);
 	if (err < 0 || amount != AVALON_READ_SIZE) {
 		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", errno);
+		applog(LOG_WARNING, "Avalon: Asked for %d, got %d",
+		       AVALON_READ_SIZE, amount);
 		return;
 	}
 
@@ -734,13 +736,6 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 	avalon->device_path = strdup(devpath);
 	add_cgpu(avalon);
 
-	ret = avalon_reset(avalon);
-	if (ret) {
-		/* FIXME:
-		 * avalon_close(fd);
-		 * return false; */
-	}
-
 	avalon_infos = realloc(avalon_infos,
 			       sizeof(struct avalon_info *) *
 			       (total_devices + 1));
@@ -768,6 +763,13 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 	info->temp_sum = 0;
 	info->temp_old = 0;
 	info->frequency = frequency;
+
+	ret = avalon_reset(avalon);
+	if (ret) {
+		/* FIXME:
+		 * avalon_close(fd);
+		 * return false; */
+	}
 
 	/* Set asic to idle mode after detect */
 	avalon_idle(avalon);
