@@ -617,14 +617,15 @@ static inline void avalon_detect_serial(void)
 
 static void avalon_initialise(struct cgpu_info *avalon)
 {
-	int err;
+	int err, interface;
 
 	if (avalon->usbinfo.nodev)
 		return;
 
+	interface = avalon->usbdev->found->interface;
 	// Reset
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_RESET,
-				FTDI_VALUE_RESET, avalon->usbdev->found->interface, C_RESET);
+				FTDI_VALUE_RESET, interface, C_RESET);
 
 	applog(LOG_DEBUG, "%s%i: reset got err %d",
 		avalon->drv->name, avalon->device_id, err);
@@ -634,7 +635,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	// Set data control
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_DATA,
-				FTDI_VALUE_DATA, avalon->usbdev->found->interface, C_SETDATA);
+				FTDI_VALUE_DATA, interface, C_SETDATA);
 
 	applog(LOG_DEBUG, "%s%i: setdata got err %d",
 		avalon->drv->name, avalon->device_id, err);
@@ -644,7 +645,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	// Set the baud
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_BAUD, FTDIR_VALUE_BAUD,
-				(FTDIR_INDEX_BAUD & 0xff00) | avalon->usbdev->found->interface,
+				(FTDIR_INDEX_BAUD & 0xff00) | interface,
 				C_SETBAUD);
 
 	applog(LOG_DEBUG, "%s%i: setbaud got err %d",
@@ -655,7 +656,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	// Set Flow Control
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_FLOW,
-				FTDI_VALUE_FLOW, avalon->usbdev->found->interface, C_SETFLOW);
+				FTDI_VALUE_FLOW, interface, C_SETFLOW);
 
 	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
@@ -665,7 +666,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	// Set Modem Control
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_MODEM,
-				FTDI_VALUE_MODEM, avalon->usbdev->found->interface, C_SETMODEM);
+				FTDI_VALUE_MODEM, interface, C_SETMODEM);
 
 	applog(LOG_DEBUG, "%s%i: setmodemctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
@@ -675,7 +676,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	// Clear any sent data
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_RESET,
-				FTDI_VALUE_PURGE_TX, avalon->usbdev->found->interface, C_PURGETX);
+				FTDI_VALUE_PURGE_TX, interface, C_PURGETX);
 
 	applog(LOG_DEBUG, "%s%i: purgetx got err %d",
 		avalon->drv->name, avalon->device_id, err);
@@ -685,7 +686,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	// Clear any received data
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_RESET,
-				FTDI_VALUE_PURGE_RX, avalon->usbdev->found->interface, C_PURGERX);
+				FTDI_VALUE_PURGE_RX, interface, C_PURGERX);
 
 	applog(LOG_DEBUG, "%s%i: purgerx got err %d",
 		avalon->drv->name, avalon->device_id, err);
