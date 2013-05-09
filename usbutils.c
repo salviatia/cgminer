@@ -1842,6 +1842,7 @@ static void rejected_inc(struct cgpu_info *cgpu)
 #endif
 
 #define USB_MAX_READ 8192
+
 int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *processed, unsigned int timeout, const char *end, enum usb_cmds cmd, bool ftdi, bool readonce)
 {
 	struct cg_usb_device *usbdev = cgpu->usbdev;

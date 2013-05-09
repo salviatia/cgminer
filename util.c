@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #ifndef WIN32
+#include <fcntl.h>
 # ifdef __linux
 #  include <sys/prctl.h>
 # endif
@@ -199,6 +200,38 @@ out:
 	return ptrlen;
 }
 
+static void keep_sockalive(SOCKETTYPE fd)
+{
+	const int tcp_one = 1;
+#ifndef WIN32
+	const int tcp_keepidle = 45;
+	const int tcp_keepintvl = 30;
+	int flags = fcntl(fd, F_GETFL, 0);
+
+	fcntl(fd, F_SETFL, O_NONBLOCK | flags);
+#else
+	u_long flags = 1;
+
+	ioctlsocket(fd, FIONBIO, &flags);
+#endif
+
+	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&tcp_one, sizeof(tcp_one));
+	if (!opt_delaynet)
+#ifndef __linux
+		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (const void *)&tcp_one, sizeof(tcp_one));
+#else /* __linux */
+		setsockopt(fd, SOL_TCP, TCP_NODELAY, (const void *)&tcp_one, sizeof(tcp_one));
+	setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &tcp_one, sizeof(tcp_one));
+	setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &tcp_keepidle, sizeof(tcp_keepidle));
+	setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &tcp_keepintvl, sizeof(tcp_keepintvl));
+#endif /* __linux */
+
+#ifdef __APPLE_CC__
+	setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &tcp_keepintvl, sizeof(tcp_keepintvl));
+#endif /* __APPLE_CC__ */
+
+}
+
 #if CURL_HAS_KEEPALIVE
 static void keep_curlalive(CURL *curl)
 {
@@ -210,41 +243,13 @@ static void keep_curlalive(CURL *curl)
 	curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, tcp_keepidle);
 	curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, tcp_keepintvl);
 }
-
-static void keep_alive(CURL *curl, __maybe_unused SOCKETTYPE fd)
-{
-	keep_curlalive(curl);
-}
 #else
-static void keep_sockalive(SOCKETTYPE fd)
-{
-	const int tcp_keepidle = 45;
-	const int tcp_keepintvl = 30;
-	const int keepalive = 1;
-	const int tcp_keepcnt = 1;
-
-	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
-# ifdef __linux
-	setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &tcp_keepcnt, sizeof(tcp_keepcnt));
-	setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &tcp_keepidle, sizeof(tcp_keepidle));
-	setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &tcp_keepintvl, sizeof(tcp_keepintvl));
-# endif /* __linux */
-# ifdef __APPLE_CC__
-	setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &tcp_keepintvl, sizeof(tcp_keepintvl));
-# endif /* __APPLE_CC__ */
-}
-
 static void keep_curlalive(CURL *curl)
 {
 	SOCKETTYPE sock;
 
 	curl_easy_getinfo(curl, CURLINFO_LASTSOCKET, (long *)&sock);
 	keep_sockalive(sock);
-}
-
-static void keep_alive(CURL __maybe_unused *curl, SOCKETTYPE fd)
-{
-	keep_sockalive(fd);
 }
 #endif
 
@@ -961,7 +966,11 @@ static enum send_ret __stratum_send(struct pool *pool, char *s, ssize_t len)
 		FD_SET(sock, &wd);
 		if (select(sock + 1, NULL, &wd, NULL, &timeout) < 1)
 			return SEND_SELECTFAIL;
+#ifndef WIN32
+		sent = send(pool->sock, s + ssent, len, MSG_NOSIGNAL);
+#else
 		sent = send(pool->sock, s + ssent, len, 0);
+#endif
 		if (sent < 0) {
 			if (!sock_blocks())
 				return SEND_SENDFAIL;
@@ -1109,7 +1118,7 @@ char *recv_line(struct pool *pool)
 				break;
 			}
 			if (n < 0) {
-				if (!sock_blocks()) {
+				if (!sock_blocks() || !socket_full(pool, false)) {
 					ret = RECV_RECVFAIL;
 					break;
 				}
@@ -1496,25 +1505,50 @@ out:
 	return ret;
 }
 
-static bool setup_stratum_curl(struct pool *pool)
+static bool setup_stratum_socket(struct pool *pool)
 {
-	char curl_err_str[CURL_ERROR_SIZE];
-	CURL *curl = NULL;
-	double byte_count;
-	char s[RBUFSIZE];
+	struct addrinfo *servinfo, *hints, *p;
+	int sockd;
 
 	mutex_lock(&pool->stratum_lock);
 	pool->stratum_active = false;
-	if (pool->stratum_curl) {
-		/* See above in suspend_stratum */
+	if (pool->sock)
 		CLOSESOCKET(pool->sock);
-	}
-	pool->stratum_curl = curl_easy_init();
-	if (unlikely(!pool->stratum_curl))
-		quit(1, "Failed to curl_easy_init in initiate_stratum");
+	pool->sock = 0;
 	mutex_unlock(&pool->stratum_lock);
 
-	curl = pool->stratum_curl;
+	hints = &pool->stratum_hints;
+	memset(hints, 0, sizeof(struct addrinfo));
+	hints->ai_family = AF_UNSPEC;
+	hints->ai_socktype = SOCK_STREAM;
+	if (getaddrinfo(pool->sockaddr_url, pool->stratum_port, hints, &servinfo) != 0) {
+		applog(LOG_WARNING, "Failed to getaddrinfo (?wrong URL) on %s:%s",
+		       pool->sockaddr_url, pool->stratum_port);
+		return false;
+	}
+
+	for (p = servinfo; p != NULL; p = p->ai_next) {
+		sockd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+		if (sockd == -1) {
+			applog(LOG_DEBUG, "Failed socket");
+			continue;
+		}
+
+		if (connect(sockd, p->ai_addr, p->ai_addrlen) == -1) {
+			CLOSESOCKET(sockd);
+			applog(LOG_DEBUG, "Failed connect");
+			continue;
+		}
+
+		break;
+	}
+	if (p == NULL) {
+		applog(LOG_INFO, "Failed to find a stratum servinfo on %s:%s",
+		       pool->sockaddr_url, pool->stratum_port);
+		freeaddrinfo(servinfo);
+		return false;
+	}
+	freeaddrinfo(servinfo);
 
 	if (!pool->sockbuf) {
 		pool->sockbuf = calloc(RBUFSIZE, 1);
@@ -1523,43 +1557,8 @@ static bool setup_stratum_curl(struct pool *pool)
 		pool->sockbuf_size = RBUFSIZE;
 	}
 
-	/* Create a http url for use with curl */
-	sprintf(s, "http://%s:%s", pool->sockaddr_url, pool->stratum_port);
-
-	curl_easy_setopt(curl, CURLOPT_FRESH_CONNECT, 1);
-	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30);
-	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_err_str);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-	curl_easy_setopt(curl, CURLOPT_URL, s);
-	if (!opt_delaynet)
-		curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1);
-	curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_TRY);
-	if (pool->rpc_proxy) {
-		curl_easy_setopt(curl, CURLOPT_PROXY, pool->rpc_proxy);
-		curl_easy_setopt(curl, CURLOPT_PROXYTYPE, pool->rpc_proxytype);
-	} else if (opt_socks_proxy) {
-		curl_easy_setopt(curl, CURLOPT_PROXY, opt_socks_proxy);
-		curl_easy_setopt(curl, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS4);
-	}
-	curl_easy_setopt(curl, CURLOPT_CONNECT_ONLY, 1);
-	if (curl_easy_perform(curl)) {
-		applog(LOG_INFO, "Stratum connect failed to pool %d: %s",
-		       pool->pool_no, curl_err_str);
-		/* Hopefully we can just clean this curl handle up properly */
-		curl_easy_cleanup(curl);
-		pool->stratum_curl = NULL;
-		return false;
-	}
-	curl_easy_getinfo(curl, CURLINFO_LASTSOCKET, (long *)&pool->sock);
-	keep_alive(curl, pool->sock);
-
-	pool->cgminer_pool_stats.times_sent++;
-	if (curl_easy_getinfo(curl, CURLINFO_SIZE_UPLOAD, &byte_count) == CURLE_OK)
-		pool->cgminer_pool_stats.bytes_sent += byte_count;
-	pool->cgminer_pool_stats.times_received++;
-	if (curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD, &byte_count) == CURLE_OK)
-		pool->cgminer_pool_stats.bytes_received += byte_count;
-
+	pool->sock = sockd;
+	keep_sockalive(sockd);
 	return true;
 }
 
@@ -1598,13 +1597,9 @@ void suspend_stratum(struct pool *pool)
 
 	mutex_lock(&pool->stratum_lock);
 	pool->stratum_active = pool->stratum_notify = false;
-	if (pool->stratum_curl) {
-		/* libcurl seems to crash occasionally on this since so just
-		 * sacrifice the ram knowing we leak one curl handle every
-		 * time we disconnect stratum. */
+	if (pool->sock)
 		CLOSESOCKET(pool->sock);
-	}
-	pool->stratum_curl = NULL;
+	pool->sock = 0;
 	mutex_unlock(&pool->stratum_lock);
 }
 
@@ -1617,7 +1612,7 @@ bool initiate_stratum(struct pool *pool)
 	int n2size;
 
 resend:
-	if (!setup_stratum_curl(pool)) {
+	if (!setup_stratum_socket(pool)) {
 		sockd = false;
 		goto out;
 	}
