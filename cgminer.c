@@ -89,7 +89,7 @@ bool opt_compact;
 const int opt_cutofftemp = 95;
 int opt_log_interval = 5;
 int opt_queue = 1;
-int opt_scantime = 60;
+int opt_scantime = -1;
 int opt_expiry = 120;
 static const bool opt_time = true;
 unsigned long long global_hashrate;
@@ -3220,8 +3220,6 @@ static void *submit_work_thread(void *userdata)
 
 	applog(LOG_DEBUG, "Creating extra submit work thread");
 
-	rebuild_hash(work);
-
 	if (stale_work(work, true)) {
 		if (opt_submit_stale)
 			applog(LOG_NOTICE, "Pool %d stale share detected, submitting as user requested", pool->pool_no);
@@ -4056,15 +4054,14 @@ void write_config(FILE *fcfg)
 		fprintf(fcfg, ",\n\"stop-time\" : \"%d:%d\"", schedstop.tm.tm_hour, schedstop.tm.tm_min);
 	if (opt_socks_proxy && *opt_socks_proxy)
 		fprintf(fcfg, ",\n\"socks-proxy\" : \"%s\"", json_escape(opt_socks_proxy));
-#ifdef HAVE_OPENCL
-	for(i = 0; i < nDevs; i++)
-		if (gpus[i].deven == DEV_DISABLED)
-			break;
-	if (i < nDevs)
-		for (i = 0; i < nDevs; i++)
-			if (gpus[i].deven != DEV_DISABLED)
+	if (devices_enabled) {
+		for (i = 0; i < (int)(sizeof(devices_enabled) * 8) - 1; ++i) {
+			if (devices_enabled & (1 << i))
 				fprintf(fcfg, ",\n\"device\" : \"%d\"", i);
-#endif
+		}
+	}
+	if (opt_removedisabled)
+		fprintf(fcfg, ",\n\"remove-disabled\" : true");
 	if (opt_api_allow)
 		fprintf(fcfg, ",\n\"api-allow\" : \"%s\"", json_escape(opt_api_allow));
 	if (strcmp(opt_api_description, PACKAGE_STRING) != 0)
@@ -5283,7 +5280,7 @@ static void gen_hash(unsigned char *data, unsigned char *hash, int len)
  * 0x00000000ffff0000000000000000000000000000000000000000000000000000
  * so we use a big endian 64 bit unsigned integer centred on the 5th byte to
  * cover a huge range of difficulty targets, though not all 256 bits' worth */
-static void set_work_target(struct work *work, double diff)
+void set_target(unsigned char *dest_target, double diff)
 {
 	unsigned char target[32];
 	uint64_t *data64, h64;
@@ -5318,7 +5315,7 @@ static void set_work_target(struct work *work, double diff)
 		applog(LOG_DEBUG, "Generated target %s", htarget);
 		free(htarget);
 	}
-	memcpy(work->target, target, 32);
+	memcpy(dest_target, target, 32);
 }
 
 /* Generates stratum based work based on the most recent notify information
@@ -5402,7 +5399,7 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
 	free(header);
 	calc_midstate(work);
 
-	set_work_target(work, work->sdiff);
+	set_target(work->target, work->sdiff);
 
 	local_work++;
 	work->pool = pool;
@@ -5464,44 +5461,13 @@ void inc_hw_errors(struct thr_info *thr)
 	thr->cgpu->drv->hw_error(thr);
 }
 
-/* Returns 1 if meets difficulty target, 0 if not, -1 if hw error */
-static int hashtest(struct thr_info *thr, struct work *work)
-{
-	uint32_t *data32 = (uint32_t *)(work->data);
-	unsigned char swap[80];
-	uint32_t *swap32 = (uint32_t *)swap;
-	unsigned char hash1[32];
-	unsigned char hash2[32];
-	uint32_t *hash2_32 = (uint32_t *)hash2;
-
-	flip80(swap32, data32);
-	sha2(swap, 80, hash1);
-	sha2(hash1, 32, work->hash);
-	flip32(hash2_32, work->hash);
-
-	if (hash2_32[7] != 0) {
-		applog(LOG_WARNING, "%s%d: invalid nonce - HW error",
-				thr->cgpu->drv->name, thr->cgpu->device_id);
-
-		return -1;
-	}
-
-	if (!fulltest(hash2, work->target)) {
-		applog(LOG_INFO, "Share below target");
-		/* Check the diff of the share, even if it didn't reach the
-		 * target, just to set the best share value if it's higher. */
-		share_diff(work);
-		return 0;
-	}
-
-	return 1;
-}
-
 void submit_nonce(struct thr_info *thr, struct work *work, uint32_t nonce)
 {
 	uint32_t *work_nonce = (uint32_t *)(work->data + 64 + 12);
 	struct timeval tv_work_found;
-	int valid;
+	unsigned char hash2[32];
+	uint32_t *hash2_32 = (uint32_t *)hash2;
+	uint32_t diff1targ;
 
 	cgtime(&tv_work_found);
 	*work_nonce = htole32(nonce);
@@ -5513,22 +5479,28 @@ void submit_nonce(struct thr_info *thr, struct work *work, uint32_t nonce)
 	mutex_unlock(&stats_lock);
 
 	/* Do one last check before attempting to submit the work */
-	if (opt_scrypt)
-		valid = scrypt_test(work->data, work->target, nonce);
-	else
-		valid = hashtest(thr, work);
+	rebuild_hash(work);
+	flip32(hash2_32, work->hash);
 
-	if (unlikely(valid == -1))
-		return inc_hw_errors(thr);
+	diff1targ = opt_scrypt ? 0x0000ffffUL : 0;
+	if (be32toh(hash2_32[7]) > diff1targ) {
+		applog(LOG_WARNING, "%s%d: invalid nonce - HW error",
+				thr->cgpu->drv->name, thr->cgpu->device_id);
+
+		inc_hw_errors(thr);
+		return;
+	}
 
 	mutex_lock(&stats_lock);
 	thr->cgpu->last_device_valid_work = time(NULL);
 	mutex_unlock(&stats_lock);
 
-	if (valid == 1)
-		submit_work_async(work, &tv_work_found);
-	else
+	if (!fulltest(hash2, work->target)) {
 		applog(LOG_INFO, "Share below target");
+		return;
+	}
+
+	submit_work_async(work, &tv_work_found);
 }
 
 static inline bool abandon_work(struct work *work, struct timeval *wdiff, uint64_t hashes)
@@ -5594,7 +5566,26 @@ static void hash_sole_work(struct thr_info *mythr)
 				"mining thread %d", thr_id);
 			break;
 		}
-		work->device_diff = MIN(drv->max_diff, work->work_difficulty);
+		work->device_diff = MIN(drv->working_diff, work->work_difficulty);
+#ifdef USE_SCRYPT
+		/* Dynamically adjust the working diff even if the target
+		 * diff is very high to ensure we can still validate scrypt is
+		 * returning shares. */
+		if (opt_scrypt) {
+			double wu;
+
+			wu = total_diff1 / total_secs * 60;
+			if (wu > 30 && drv->working_diff < drv->max_diff &&
+			    drv->working_diff < work->work_difficulty) {
+				drv->working_diff++;
+				applog(LOG_DEBUG, "Driver %s working diff changed to %.0f",
+					drv->dname, drv->working_diff);
+				work->device_diff = MIN(drv->working_diff, work->work_difficulty);
+			} else if (drv->working_diff > work->work_difficulty)
+				drv->working_diff = work->work_difficulty;
+			set_target(work->device_target, work->device_diff);
+		}
+#endif
 
 		do {
 			cgtime(&tv_start);
@@ -6849,6 +6840,8 @@ void fill_device_drv(struct cgpu_info *cgpu)
 		drv->queue_full = &noop_queue_full;
 	if (!drv->max_diff)
 		drv->max_diff = 1;
+	if (!drv->working_diff)
+		drv->working_diff = 1;
 }
 
 void enable_device(struct cgpu_info *cgpu)
@@ -7208,6 +7201,9 @@ int main(int argc, char *argv[])
 	if (want_per_device_stats)
 		opt_log_output = true;
 
+	/* Use a shorter scantime for scrypt */
+	if (opt_scantime < 0)
+		opt_scantime = opt_scrypt ? 30 : 60;
 #ifdef USE_USBUTILS
 	usb_initialise();
 #endif
