@@ -633,32 +633,12 @@ static void avalon_initialise(struct cgpu_info *avalon)
 	if (avalon->usbinfo.nodev)
 		return;
 
-	// Set data control
-	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_DATA,
-				FTDI_VALUE_DATA, interface, C_SETDATA);
-
-	applog(LOG_DEBUG, "%s%i: setdata got err %d",
-		avalon->drv->name, avalon->device_id, err);
-
-	if (avalon->usbinfo.nodev)
-		return;
-
 	// Set the baud
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_BAUD, FTDIR_VALUE_BAUD,
 				(FTDIR_INDEX_BAUD & 0xff00) | interface,
 				C_SETBAUD);
 
 	applog(LOG_DEBUG, "%s%i: setbaud got err %d",
-		avalon->drv->name, avalon->device_id, err);
-
-	if (avalon->usbinfo.nodev)
-		return;
-
-	// Set Flow Control
-	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_FLOW,
-				FTDI_VALUE_FLOW, interface, C_SETFLOW);
-
-	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
 
 	if (avalon->usbinfo.nodev)
@@ -674,21 +654,11 @@ static void avalon_initialise(struct cgpu_info *avalon)
 	if (avalon->usbinfo.nodev)
 		return;
 
-	// Clear any sent data
-	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_RESET,
-				FTDI_VALUE_PURGE_TX, interface, C_PURGETX);
+	// Set Flow Control
+	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_FLOW,
+				FTDI_VALUE_FLOW, interface, C_SETFLOW);
 
-	applog(LOG_DEBUG, "%s%i: purgetx got err %d",
-		avalon->drv->name, avalon->device_id, err);
-
-	if (avalon->usbinfo.nodev)
-		return;
-
-	// Clear any received data
-	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_RESET,
-				FTDI_VALUE_PURGE_RX, interface, C_PURGERX);
-
-	applog(LOG_DEBUG, "%s%i: purgerx got err %d",
+	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
 }
 
