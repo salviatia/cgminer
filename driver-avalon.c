@@ -623,6 +623,16 @@ static void avalon_initialise(struct cgpu_info *avalon)
 		return;
 
 	interface = avalon->usbdev->found->interface;
+	// Set latency timer
+	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_LATENCY,
+				FTDI_VALUE_LATENCY, interface, C_LATENCY);
+
+	applog(LOG_DEBUG, "%s%i: latency got err %d",
+		avalon->drv->name, avalon->device_id, err);
+
+	if (avalon->usbinfo.nodev)
+		return;
+
 	// Reset
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_RESET,
 				FTDI_VALUE_RESET, interface, C_RESET);

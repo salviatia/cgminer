@@ -302,6 +302,7 @@ static const char *C_GETIDENTIFY_S = "GetIdentify";
 static const char *C_REQUESTFLASH_S = "RequestFlash";
 static const char *C_REQUESTSENDWORK_S = "RequestSendWork";
 static const char *C_REQUESTSENDWORKSTATUS_S = "RequestSendWorkStatus";
+static const char *C_LATENCY_S = "Latency";
 static const char *C_RESET_S = "Reset";
 static const char *C_SETBAUD_S = "SetBaud";
 static const char *C_SETDATA_S = "SetDataCtrl";
@@ -773,6 +774,7 @@ static void cgusb_check_init()
 		usb_commands[C_REQUESTFLASH] = C_REQUESTFLASH_S;
 		usb_commands[C_REQUESTSENDWORK] = C_REQUESTSENDWORK_S;
 		usb_commands[C_REQUESTSENDWORKSTATUS] = C_REQUESTSENDWORKSTATUS_S;
+		usb_commands[C_LATENCY] = C_LATENCY_S;
 		usb_commands[C_RESET] = C_RESET_S;
 		usb_commands[C_SETBAUD] = C_SETBAUD_S;
 		usb_commands[C_SETDATA] = C_SETDATA_S;

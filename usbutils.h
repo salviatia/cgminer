@@ -20,6 +20,7 @@
 #define FTDI_REQUEST_FLOW ((uint8_t)2)
 #define FTDI_REQUEST_BAUD ((uint8_t)3)
 #define FTDI_REQUEST_DATA ((uint8_t)4)
+#define FTDI_REQUEST_LATENCY ((uint8_t)9)
 
 #define FTDI_VALUE_RESET 0
 #define FTDI_VALUE_PURGE_RX 1
@@ -34,6 +35,8 @@
 #define FTDI_VALUE_DATA 0
 #define FTDI_VALUE_FLOW 0
 #define FTDI_VALUE_MODEM 0x0303
+
+#define FTDI_VALUE_LATENCY 0x0001
 
 // Use the device defined timeout
 #define DEVTIMEOUT 0
@@ -117,6 +120,7 @@ enum usb_cmds {
 	C_REQUESTFLASH,
 	C_REQUESTSENDWORK,
 	C_REQUESTSENDWORKSTATUS,
+	C_LATENCY,
 	C_RESET,
 	C_SETBAUD,
 	C_SETDATA,
