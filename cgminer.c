@@ -125,6 +125,7 @@ static bool opt_submit_stale = true;
 static int opt_shares;
 bool opt_fail_only;
 static bool opt_fix_protocol;
+static bool opt_lowmem;
 bool opt_autofan;
 bool opt_autoengine;
 bool opt_noadl;
@@ -1019,6 +1020,9 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--log|-l",
 		     set_int_0_to_9999, opt_show_intval, &opt_log_interval,
 		     "Interval in seconds between log output"),
+	OPT_WITHOUT_ARG("--lowmem",
+			opt_set_bool, &opt_lowmem,
+			"Minimise caching of shares for low memory applications"),
 #if defined(unix)
 	OPT_WITH_ARG("--monitor|-m",
 		     opt_set_charp, NULL, &opt_stderr_cmd,
@@ -2444,6 +2448,10 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 		if (!pool_tset(pool, &pool->submit_fail)) {
 			total_ro++;
 			pool->remotefail_occasions++;
+			if (opt_lowmem) {
+				applog(LOG_WARNING, "Pool %d communication failure, discarding shares", pool->pool_no);
+				goto out;
+			}
 			applog(LOG_WARNING, "Pool %d communication failure, caching submissions", pool->pool_no);
 		}
 		nmsleep(5000);
@@ -3292,6 +3300,11 @@ static void *submit_work_thread(void *userdata)
 				pool->remotefail_occasions++;
 			}
 
+			if (opt_lowmem) {
+				applog(LOG_DEBUG, "Lowmem option prevents resubmitting stratum share");
+				break;
+			}
+
 			cg_rlock(&pool->data_lock);
 			sessionid_match = (pool->nonce1 && !strcmp(work->nonce1, pool->nonce1));
 			cg_runlock(&pool->data_lock);
@@ -3317,6 +3330,10 @@ static void *submit_work_thread(void *userdata)
 	ce = pop_curl_entry(pool);
 	/* submit solution to bitcoin via JSON-RPC */
 	while (!submit_upstream_work(work, ce->curl, resubmit)) {
+		if (opt_lowmem) {
+			applog(LOG_NOTICE, "Pool %d share being discarded to minimise memory cache", pool->pool_no);
+			break;
+		}
 		resubmit = true;
 		if (stale_work(work, true)) {
 			applog(LOG_NOTICE, "Pool %d share became stale while retrying submit, discarding", pool->pool_no);
@@ -4740,10 +4757,35 @@ static bool parse_stratum_response(struct pool *pool, char *s)
 	mutex_unlock(&sshare_lock);
 
 	if (!sshare) {
-		if (json_is_true(res_val))
+		double pool_diff;
+
+		/* Since the share is untracked, we can only guess at what the
+		 * work difficulty is based on the current pool diff. */
+		cg_rlock(&pool->data_lock);
+		pool_diff = pool->swork.diff;
+		cg_runlock(&pool->data_lock);
+
+		if (json_is_true(res_val)) {
 			applog(LOG_NOTICE, "Accepted untracked stratum share from pool %d", pool->pool_no);
-		else
+
+			/* We don't know what device this came from so we can't
+			 * attribute the work to the relevant cgpu */
+			mutex_lock(&stats_lock);
+			total_accepted++;
+			pool->accepted++;
+			total_diff_accepted += pool_diff;
+			pool->diff_accepted += pool_diff;
+			mutex_unlock(&stats_lock);
+		} else {
 			applog(LOG_NOTICE, "Rejected untracked stratum share from pool %d", pool->pool_no);
+
+			mutex_lock(&stats_lock);
+			total_rejected++;
+			pool->rejected++;
+			total_diff_rejected += pool_diff;
+			pool->diff_rejected += pool_diff;
+			mutex_unlock(&stats_lock);
+		}
 		goto out;
 	}
 	stratum_share_result(val, res_val, err_val, sshare);
@@ -4939,7 +4981,7 @@ static void *stratum_thread(void *userdata)
 			/* If the socket to our stratum pool disconnects, all
 			 * tracked submitted shares are lost and we will leak
 			 * the memory if we don't discard their records. */
-			if (!supports_resume(pool))
+			if (!supports_resume(pool) || opt_lowmem)
 				clear_stratum_shares(pool);
 			clear_pool_work(pool);
 			if (pool == current_pool())
