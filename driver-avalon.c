@@ -615,14 +615,6 @@ static inline void avalon_detect_serial(void)
 }
 #endif
 
-static void read_ftdi_status(struct cgpu_info *avalon)
-{
-	char buf[2];
-	int ret;
-
-	usb_read_once(avalon, buf, 2, &ret, C_FTDI_STATUS);
-}
-
 static void avalon_initialise(struct cgpu_info *avalon)
 {
 	int err, interface;
@@ -631,9 +623,9 @@ static void avalon_initialise(struct cgpu_info *avalon)
 		return;
 
 	interface = avalon->usbdev->found->interface;
-	// Set latency timer
-	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_LATENCY,
-				FTDI_VALUE_LATENCY, interface, C_LATENCY);
+	// Set data
+	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_DATA,
+				FTDIR_VALUE_DATA, interface, C_SETDATA);
 
 	applog(LOG_DEBUG, "%s%i: latency got err %d",
 		avalon->drv->name, avalon->device_id, err);
@@ -679,8 +671,6 @@ static void avalon_initialise(struct cgpu_info *avalon)
 	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
 
-	read_ftdi_status(avalon);
-
 	// Set Modem Control 2nd time
 	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_MODEM,
 				FTDI_VALUE_MODEM, interface, C_SETMODEM);
@@ -697,8 +687,6 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
-
-	read_ftdi_status(avalon);
 }
 
 static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found)
