@@ -670,6 +670,23 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
+
+	// Set Modem Control 2nd time
+	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_MODEM,
+				FTDI_VALUE_MODEM, interface, C_SETMODEM);
+
+	applog(LOG_DEBUG, "%s%i: setmodemctrl got err %d",
+		avalon->drv->name, avalon->device_id, err);
+
+	if (avalon->usbinfo.nodev)
+		return;
+
+	// Set Flow Control 2nd time
+	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_FLOW,
+				FTDI_VALUE_FLOW, interface, C_SETFLOW);
+
+	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
+		avalon->drv->name, avalon->device_id, err);
 }
 
 static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found)
