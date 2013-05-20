@@ -364,9 +364,11 @@ static int avalon_reset(struct cgpu_info *avalon)
 
 static void avalon_idle(struct cgpu_info *avalon)
 {
-	int i, ret;
+	struct avalon_result ar;
 	struct avalon_task at;
+	int i, ret, max_ms;
 
+	max_ms = 200;
 	struct avalon_info *info = avalon_infos[avalon->device_id];
 	int avalon_get_work_count = info->miner_count;
 
@@ -382,6 +384,7 @@ static void avalon_idle(struct cgpu_info *avalon)
 		}
 	}
 	applog(LOG_ERR, "Avalon: Goto idle mode");
+	avalon_get_result(avalon, &ar, avalon->thr[0], &max_ms);
 }
 
 static void get_options(int this_option_offset, int *baud, int *miner_count,
