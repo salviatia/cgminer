@@ -778,7 +778,7 @@ static bool avalon_prepare(struct thr_info *thr)
 	if (!avalon->works)
 		quit(1, "Failed to calloc avalon works in avalon_prepare");
 
-	avalon_init(avalon);
+	__avalon_init(avalon);
 
 	cgtime(&now);
 	get_datestamp(avalon->init, &now);
