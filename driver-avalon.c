@@ -209,11 +209,10 @@ static int avalon_send_task(const struct avalon_task *at,
 
 static inline int
 avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
-	    struct timeval *tv_finish, int *max_timeout)
+	    int *max_timeout)
 {
-	int read_amount = AVALON_READ_SIZE;
 	struct timeval tv_before, tv_after, tv_diff;
-	bool first = true;
+	int read_amount = AVALON_READ_SIZE;
 	unsigned int timeout;
 	int ret, err;
 
@@ -228,10 +227,6 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
 					    timeout, C_GET_AR);
 		cgtime(&tv_after);
-		if (likely(first)) {
-			copy_time(tv_finish, &tv_after);
-			first = false;
-		}
 		timersub(&tv_after, &tv_before, &tv_diff);
 		*max_timeout -= tv_diff.tv_sec * 1000;
 		*max_timeout -= tv_diff.tv_usec / 1000;
@@ -254,14 +249,13 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 }
 
 static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
-			     struct thr_info *thr, struct timeval *tv_finish,
-			     int *max_timeout)
+			     struct thr_info *thr, int *max_timeout)
 {
 	uint8_t result[AVALON_READ_SIZE];
 	int ret;
 
 	memset(result, 0, AVALON_READ_SIZE);
-	ret = avalon_gets(avalon, result, thr, tv_finish, max_timeout);
+	ret = avalon_gets(avalon, result, thr, max_timeout);
 
 	if (ret == AVA_GETS_OK) {
 		if (opt_debug) {
@@ -959,7 +953,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	result_wrong = 0;
 	hash_count = 0;
 	while (true) {
-		ret = avalon_get_result(avalon, &ar, thr, &tv_finish, &max_ms);
+		ret = avalon_get_result(avalon, &ar, thr, &max_ms);
+		cgtime(&tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
 			applog(LOG_ERR,
 			       "AVA%i: Comms error(read)", avalon->device_id);
