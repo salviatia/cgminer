@@ -316,14 +316,20 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	memcpy(ar, result, AVALON_READ_SIZE);
 }
 
+static void avalon_wait_ready(struct cgpu_info *avalon)
+{
+	while (avalon_buffer_full(avalon))
+		nmsleep(100);
+}
+
 static int avalon_reset(struct cgpu_info *avalon)
 {
 	struct avalon_result ar;
 	uint8_t *buf;
-	int err, i = 0, amount, tries = 0;
+	int err, i = 0, amount;
 	struct timespec p;
 
-retry:
+	avalon_wait_ready(avalon);
 	err = usb_write(avalon, "ad", 2, &amount, C_AVALON_RESET);
 	applog(LOG_DEBUG, "%s%i: avalon reset got err %d",
 	       avalon->drv->name, avalon->device_id, err);
@@ -348,8 +354,6 @@ retry:
 		applog(LOG_ERR, "Avalon: Reset failed! not an Avalon?"
 		       " (%d: %02x %02x %02x %02x)",
 		       i, buf[0], buf[1], buf[2], buf[3]);
-		if (++tries < 2)
-			goto retry;
 		/* FIXME: return 1; */
 	} else {
 		applog(LOG_WARNING, "Avalon: Reset succeeded");
@@ -369,6 +373,7 @@ static void avalon_idle(struct cgpu_info *avalon)
 	int avalon_get_work_count = info->miner_count;
 
 	i = 0;
+	avalon_wait_ready(avalon);
 	while (true) {
 		avalon_init_task(&at, 0, 0, info->fan_pwm,
 				 info->timeout, info->asic_count,
