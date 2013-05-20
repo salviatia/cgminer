@@ -338,10 +338,6 @@ static int avalon_reset(struct cgpu_info *avalon)
 	avalon_get_reset(avalon, &ar);
 
 	buf = (uint8_t *)&ar;
-	/* Sometimes there is one extra 0 byte for some reason in the buffer,
-	 * so work around it. */
-	if (buf[0] == 0)
-		buf = (uint8_t  *)(&ar + 1);
 	if (buf[0] == 0xAA && buf[1] == 0x55 &&
 	    buf[2] == 0xAA && buf[3] == 0x55) {
 		for (i = 4; i < 11; i++)
@@ -617,7 +613,8 @@ static inline void avalon_detect_serial(void)
 
 static void avalon_initialise(struct cgpu_info *avalon)
 {
-	int err, interface;
+	int err, interface, amount;
+	char buf[8];
 
 	if (avalon->usbinfo.nodev)
 		return;
@@ -670,6 +667,14 @@ static void avalon_initialise(struct cgpu_info *avalon)
 
 	applog(LOG_DEBUG, "%s%i: setflowctrl got err %d",
 		avalon->drv->name, avalon->device_id, err);
+
+	if (avalon->usbinfo.nodev)
+		return;
+
+	err = usb_ftdi_read_timeout(avalon, buf, 2, &amount, 100, C_GET_AVALON_READY);
+
+	applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
+	       avalon->drv->name, avalon->device_id, err);
 }
 
 static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found)
