@@ -320,9 +320,10 @@ static int avalon_reset(struct cgpu_info *avalon)
 {
 	struct avalon_result ar;
 	uint8_t *buf;
-	int err, i = 0, amount;
+	int err, i = 0, amount, tries = 0;
 	struct timespec p;
 
+retry:
 	err = usb_write(avalon, "ad", 2, &amount, C_AVALON_RESET);
 	applog(LOG_DEBUG, "%s%i: avalon reset got err %d",
 	       avalon->drv->name, avalon->device_id, err);
@@ -347,6 +348,8 @@ static int avalon_reset(struct cgpu_info *avalon)
 		applog(LOG_ERR, "Avalon: Reset failed! not an Avalon?"
 		       " (%d: %02x %02x %02x %02x)",
 		       i, buf[0], buf[1], buf[2], buf[3]);
+		if (++tries < 2)
+			goto retry;
 		/* FIXME: return 1; */
 	} else
 		applog(LOG_WARNING, "Avalon: Reset succeeded");
