@@ -209,11 +209,12 @@ static int avalon_send_task(const struct avalon_task *at,
 
 static inline int
 avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
-	    struct timeval *tv_finish, int *timeout)
+	    struct timeval *tv_finish, int *max_timeout)
 {
 	int read_amount = AVALON_READ_SIZE;
 	struct timeval tv_before, tv_after, tv_diff;
 	bool first = true;
+	unsigned int timeout;
 	int ret, err;
 
 	while (true) {
@@ -222,19 +223,20 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 			return AVA_GETS_RESTART;
 		}
 
+		timeout = *max_timeout;
 		cgtime(&tv_before);
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
-					    *timeout, C_GET_AR);
+					    timeout, C_GET_AR);
 		cgtime(&tv_after);
 		if (likely(first)) {
 			copy_time(tv_finish, &tv_after);
 			first = false;
 		}
 		timersub(&tv_after, &tv_before, &tv_diff);
-		*timeout -= tv_diff.tv_sec * 1000;
-		*timeout -= tv_diff.tv_usec / 1000;
+		*max_timeout -= tv_diff.tv_sec * 1000;
+		*max_timeout -= tv_diff.tv_usec / 1000;
 
-		if (err == LIBUSB_ERROR_TIMEOUT || *timeout < 0) {
+		if (err == LIBUSB_ERROR_TIMEOUT || *max_timeout <= 0) {
 			err = 0;
 			if (!ret && read_amount == AVALON_READ_SIZE)
 				return AVA_GETS_TIMEOUT;
@@ -966,7 +968,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		}
 		if (unlikely(ret == AVA_GETS_RESTART))
 			break;
-		if (ret == AVA_GETS_TIMEOUT || max_ms < 0) {
+		if (ret == AVA_GETS_TIMEOUT || max_ms <= 0) {
 			timersub(&tv_finish, &tv_start, &elapsed);
 			applog(LOG_DEBUG, "Avalon: Not looking for more nonces");
 			break;
