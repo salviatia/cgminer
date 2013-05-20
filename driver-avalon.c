@@ -223,6 +223,11 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
 					    100, C_GET_AR);
+		if (likely(first)) {
+			cgtime(tv_finish);
+			first = false;
+		}
+
 		if (err == LIBUSB_ERROR_TIMEOUT) {
 			err = 0;
 			if (!ret)
@@ -233,10 +238,6 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 			return AVA_GETS_ERROR;
 		}
 
-		if (likely(first)) {
-			cgtime(tv_finish);
-			first = false;
-		}
 		if (likely(ret >= read_amount))
 			return AVA_GETS_OK;
 		buf += ret;
@@ -912,12 +913,13 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	uint32_t nonce;
 	int64_t hash_count;
 	int result_wrong;
-	int timeouts = 0;
+	double max_time;
 
 	avalon = thr->cgpu;
 	works = avalon->works;
 	info = avalon_infos[avalon->device_id];
 	avalon_get_work_count = info->miner_count;
+	max_time = (double)429 / (double)info->frequency;
 
 	start_count = avalon->work_array * avalon_get_work_count;
 	end_count = start_count + avalon_get_work_count;
@@ -948,6 +950,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	result_wrong = 0;
 	hash_count = 0;
 	while (true) {
+		double elapsed_timeout;
+
 		ret = avalon_get_result(avalon, &ar, thr, &tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
 			applog(LOG_ERR,
@@ -959,10 +963,9 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			break;
 		if (unlikely(ret == AVA_GETS_TIMEOUT)) {
 			timersub(&tv_finish, &tv_start, &elapsed);
-			applog(LOG_DEBUG, "Avalon: no nonce in (%ld.%06lds)",
-			       elapsed.tv_sec, elapsed.tv_usec);
-			timeouts++;
-			if (timeouts > 4000 / info->frequency) {
+			elapsed_timeout = elapsed.tv_sec + ((double)elapsed.tv_usec / (double)1000000);
+			applog(LOG_DEBUG, "Avalon: no nonce in (%.6fs)", elapsed_timeout);
+			if (elapsed_timeout > max_time) {
 				applog(LOG_DEBUG, "Avalon: Not looking for more nonces");
 				break;
 			}
