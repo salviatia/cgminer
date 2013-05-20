@@ -122,6 +122,13 @@ static inline void avalon_create_task(struct avalon_task *at,
 	memcpy(at->data, work->data + 64, 12);
 }
 
+/* Wait till the  buffer can accept more writes */
+static void avalon_wait_ready(struct cgpu_info *avalon)
+{
+	while (avalon_buffer_full(avalon))
+		nmsleep(100);
+}
+
 static int avalon_send_task(const struct avalon_task *at,
 			    struct cgpu_info *avalon)
 
@@ -134,7 +141,6 @@ static int avalon_send_task(const struct avalon_task *at,
 	uint64_t delay = 32000000; /* Default 32ms for B19200 */
 	uint32_t nonce_range;
 	int i, amount = 0;
-	bool full;
 
 	if (at->nonce_elf)
 		nr_len = AVALON_WRITE_SIZE + 4 * at->asic_num;
@@ -184,6 +190,7 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
+	avalon_wait_ready(avalon);
 	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
 			C_AVALON_TASK);
 
@@ -197,14 +204,7 @@ static int avalon_send_task(const struct avalon_task *at,
 	nanosleep(&p, NULL);
 	applog(LOG_DEBUG, "Avalon: Sent: Buffer delay: %ld", p.tv_nsec);
 
-	full = avalon_buffer_full(avalon);
-	applog(LOG_DEBUG, "Avalon: Sent: Buffer full: %s",
-	       ((full == AVA_BUFFER_FULL) ? "Yes" : "No"));
-
-	if (unlikely(full == AVA_BUFFER_FULL))
-		return AVA_SEND_BUFFER_FULL;
-
-	return AVA_SEND_BUFFER_EMPTY;
+	return AVA_SEND_OK;
 }
 
 static inline int
@@ -316,12 +316,6 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	memcpy(ar, result, AVALON_READ_SIZE);
 }
 
-static void avalon_wait_ready(struct cgpu_info *avalon)
-{
-	while (avalon_buffer_full(avalon))
-		nmsleep(100);
-}
-
 static int avalon_reset(struct cgpu_info *avalon)
 {
 	struct avalon_result ar;
@@ -372,26 +366,16 @@ static void avalon_idle(struct cgpu_info *avalon)
 	struct avalon_info *info = avalon_infos[avalon->device_id];
 	int avalon_get_work_count = info->miner_count;
 
-	i = 0;
 	avalon_wait_ready(avalon);
-	while (true) {
+	for (i = 0; i < avalon_get_work_count; i++) {
 		avalon_init_task(&at, 0, 0, info->fan_pwm,
 				 info->timeout, info->asic_count,
 				 info->miner_count, 1, 1, info->frequency);
 		ret = avalon_send_task(&at, avalon);
-		if (unlikely(ret == AVA_SEND_ERROR ||
-			     (ret == AVA_SEND_BUFFER_EMPTY &&
-			      (i + 1 == avalon_get_work_count * 2)))) {
+		if (unlikely(ret == AVA_SEND_ERROR)) {
 			applog(LOG_ERR, "AVA%i: Comms error", avalon->device_id);
 			return;
 		}
-		if (i + 1 == avalon_get_work_count * 2)
-			break;
-
-		if (ret == AVA_SEND_BUFFER_FULL)
-			break;
-
-		i++;
 	}
 	applog(LOG_ERR, "Avalon: Goto idle mode");
 }
@@ -764,15 +748,16 @@ static void avalon_detect(void)
 	usb_detect(&avalon_drv, avalon_detect_one);
 }
 
-static void __avalon_init(struct cgpu_info *avalon)
+static void avalon_init(struct cgpu_info *avalon)
 {
 	applog(LOG_INFO, "Avalon: Opened on %s", avalon->device_path);
 }
 
-static void avalon_init(struct cgpu_info *avalon)
+static void avalon_reinit(struct cgpu_info *avalon)
 {
+	avalon_initialise(avalon);
 	avalon_reset(avalon);
-	__avalon_init(avalon);
+	avalon_idle(avalon);
 }
 
 static bool avalon_prepare(struct thr_info *thr)
@@ -787,7 +772,7 @@ static bool avalon_prepare(struct thr_info *thr)
 	if (!avalon->works)
 		quit(1, "Failed to calloc avalon works in avalon_prepare");
 
-	__avalon_init(avalon);
+	avalon_init(avalon);
 
 	cgtime(&now);
 	get_datestamp(avalon->init, &now);
@@ -926,7 +911,6 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	struct timeval tv_start, tv_finish, elapsed;
 	uint32_t nonce;
 	int64_t hash_count;
-	static int first_try = 0;
 	int result_wrong;
 
 	avalon = thr->cgpu;
@@ -934,59 +918,28 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	info = avalon_infos[avalon->device_id];
 	avalon_get_work_count = info->miner_count;
 
-#if 0
-	if (unlikely(avalon->device_fd == -1)) {
-		if (!avalon_prepare(thr)) {
-			applog(LOG_ERR, "AVA%i: Comms error(open)",
-			       avalon->device_id);
-			dev_error(avalon, REASON_DEV_COMMS_ERROR);
-			/* fail the device if the reopen attempt fails */
-			return -1;
-		}
-	}
-	fd = avalon->device_fd;
-#ifndef WIN32
-	tcflush(fd, TCOFLUSH);
-#endif
-#endif
-
 	start_count = avalon->work_array * avalon_get_work_count;
 	end_count = start_count + avalon_get_work_count;
-	i = start_count;
-	while (true) {
+	for (i = start_count; i < end_count; i++) {
 		avalon_init_task(&at, 0, 0, info->fan_pwm,
 				 info->timeout, info->asic_count,
 				 info->miner_count, 1, 0, info->frequency);
 		avalon_create_task(&at, works[i]);
 		ret = avalon_send_task(&at, avalon);
-		if (unlikely(ret == AVA_SEND_ERROR ||
-			     (ret == AVA_SEND_BUFFER_EMPTY &&
-			      (i + 1 == end_count) &&
-			      first_try))) {
-			do_avalon_close(thr);
+		if (unlikely(ret == AVA_SEND_ERROR)) {
 			applog(LOG_ERR, "AVA%i: Comms error(buffer)",
 			       avalon->device_id);
+#if 0
+			do_avalon_close(thr);
 			dev_error(avalon, REASON_DEV_COMMS_ERROR);
-			first_try = 0;
 			sleep(1);
 			avalon_init(avalon);
+#endif
 			return 0;	/* This should never happen */
-		}
-		if (ret == AVA_SEND_BUFFER_EMPTY && (i + 1 == end_count)) {
-			first_try = 1;
-			avalon_rotate_array(avalon);
-			return 0xffffffff;
 		}
 
 		works[i]->blk.nonce = 0xffffffff;
-
-		if (ret == AVA_SEND_BUFFER_FULL)
-			break;
-
-		i++;
 	}
-	if (unlikely(first_try))
-		first_try = 0;
 
 	elapsed.tv_sec = elapsed.tv_usec = 0;
 	cgtime(&tv_start);
@@ -994,15 +947,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	result_wrong = 0;
 	hash_count = 0;
 	while (true) {
-		full = avalon_buffer_full(avalon);
-		applog(LOG_DEBUG, "Avalon: Buffer full: %s",
-		       ((full == AVA_BUFFER_FULL) ? "Yes" : "No"));
-		if (unlikely(full == AVA_BUFFER_EMPTY))
-			break;
-
 		ret = avalon_get_result(avalon, &ar, thr, &tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
-			do_avalon_close(thr);
 			applog(LOG_ERR,
 			       "AVA%i: Comms error(read)", avalon->device_id);
 			dev_error(avalon, REASON_DEV_COMMS_ERROR);
@@ -1046,16 +992,18 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		avalon->results++;
 	if (unlikely((result_wrong >= avalon_get_work_count) ||
 	    (!hash_count && ret != AVA_GETS_RESTART && --avalon->results < 0))) {
+		applog(LOG_ERR,
+			"AVA%i: FPGA controller messed up, %d wrong results",
+			avalon->device_id, result_wrong);
+#if 0
 		/* Look for all invalid results, or consecutive failure
 		 * to generate any results suggesting the FPGA
 		 * controller has screwed up. */
 		do_avalon_close(thr);
-		applog(LOG_ERR,
-			"AVA%i: FPGA controller messed up, %d wrong results",
-			avalon->device_id, result_wrong);
 		dev_error(avalon, REASON_DEV_COMMS_ERROR);
 		sleep(1);
 		avalon_init(avalon);
+#endif
 		return 0;
 	}
 
@@ -1130,6 +1078,6 @@ struct device_drv avalon_drv = {
 	.queue_full = avalon_fill,
 	.scanwork = avalon_scanhash,
 	.get_api_stats = avalon_api_stats,
-	.reinit_device = avalon_init,
+	.reinit_device = avalon_reinit,
 	.thread_shutdown = avalon_shutdown,
 };
