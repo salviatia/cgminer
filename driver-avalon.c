@@ -213,7 +213,7 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 {
 	struct timeval tv_before, tv_after, tv_diff;
 	int read_amount = AVALON_READ_SIZE;
-	unsigned int timeout;
+	const unsigned int timeout = 100;
 	int ret, err;
 
 	while (true) {
@@ -222,10 +222,6 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 			return AVA_GETS_RESTART;
 		}
 
-		if (*max_timeout > 100)
-			timeout = 100;
-		else
-			timeout = *max_timeout;
 		cgtime(&tv_before);
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
 					    timeout, C_GET_AR);
@@ -234,7 +230,7 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 		*max_timeout -= tv_diff.tv_sec * 1000;
 		*max_timeout -= tv_diff.tv_usec / 1000;
 
-		if (err == LIBUSB_ERROR_TIMEOUT || *max_timeout <= 0) {
+		if (*max_timeout <= 0) {
 			err = 0;
 			if (!ret && read_amount == AVALON_READ_SIZE)
 				return AVA_GETS_TIMEOUT;
