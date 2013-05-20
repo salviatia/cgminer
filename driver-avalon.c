@@ -222,7 +222,10 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 			return AVA_GETS_RESTART;
 		}
 
-		timeout = *max_timeout;
+		if (*max_timeout > 100)
+			timeout = 100;
+		else
+			timeout = *max_timeout;
 		cgtime(&tv_before);
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
 					    timeout, C_GET_AR);
@@ -925,7 +928,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	info = avalon_infos[avalon->device_id];
 	avalon_get_work_count = info->miner_count;
 	/* Do not try to read to the max nonce range or we may overshoot */
-	max_ms = 400000 / info->frequency;
+	max_ms = 270000 / info->frequency;
 
 	start_count = avalon->work_array * avalon_get_work_count;
 	end_count = start_count + avalon_get_work_count;
