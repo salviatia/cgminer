@@ -964,7 +964,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			applog(LOG_ERR,
 			       "AVA%i: Comms error(read)", avalon->device_id);
 			dev_error(avalon, REASON_DEV_COMMS_ERROR);
-			return 0;
+			break;
 		}
 
 		decoded = avalon_decode_nonce(thr, &ar, &nonce);
@@ -1018,8 +1018,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		dev_error(avalon, REASON_DEV_COMMS_ERROR);
 		sleep(1);
 		avalon_init(avalon);
-#endif
 		return 0;
+#endif
 	}
 
 	avalon_rotate_array(avalon);
