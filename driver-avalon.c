@@ -300,7 +300,7 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 				    1000, C_GET_AR);
 	if (err < 0 || amount != AVALON_READ_SIZE) {
 		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", err);
-		applog(LOG_WARNING, "Avalon: USB read asked for %d, got %d",
+		applog(LOG_WARNING, "Avalon: USB read asked for %lu, got %d",
 		       AVALON_READ_SIZE, amount);
 		if (opt_debug && amount) {
 			applog(LOG_DEBUG, "Avalon: got:");
