@@ -956,6 +956,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	result_wrong = 0;
 	hash_count = 0;
 	while (true) {
+		bool decoded;
+
 		ret = avalon_get_result(avalon, &ar, thr, &max_ms);
 		cgtime(&tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
@@ -964,6 +966,11 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			dev_error(avalon, REASON_DEV_COMMS_ERROR);
 			return 0;
 		}
+
+		decoded = avalon_decode_nonce(thr, &ar, &nonce);
+		if (decoded)
+			hash_count += 0xffffffff;
+
 		if (unlikely(ret == AVA_GETS_RESTART))
 			break;
 		if (ret == AVA_GETS_TIMEOUT || max_ms <= 0) {
@@ -972,7 +979,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			break;
 		}
 
-		if (!avalon_decode_nonce(thr, &ar, &nonce)) {
+		if (!decoded) {
 			info->no_matching_work++;
 			result_wrong++;
 
@@ -988,7 +995,6 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			continue;
 		}
 
-		hash_count += 0xffffffff;
 		if (opt_debug) {
 			timersub(&tv_finish, &tv_start, &elapsed);
 			applog(LOG_DEBUG,
