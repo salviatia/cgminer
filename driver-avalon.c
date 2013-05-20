@@ -966,7 +966,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		}
 		if (unlikely(ret == AVA_GETS_RESTART))
 			break;
-		if (unlikely(ret == AVA_GETS_TIMEOUT)) {
+		if (ret == AVA_GETS_TIMEOUT || max_ms < 0) {
 			timersub(&tv_finish, &tv_start, &elapsed);
 			applog(LOG_DEBUG, "Avalon: Not looking for more nonces");
 			break;
