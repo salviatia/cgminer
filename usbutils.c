@@ -2044,11 +2044,12 @@ int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *pro
 
 int usb_ftdi_cts(struct cgpu_info *cgpu)
 {
-	char buf[2], ret;
-	int amount;
+	struct cg_usb_device *usbdev = cgpu->usbdev;
+	unsigned char buf[2], ret;
 
-	_usb_read(cgpu, DEFAULT_EP_IN, buf, 2, &amount, DEVTIMEOUT, NULL,
-		  C_FTDI_STATUS, false, true);
+	libusb_control_transfer(usbdev->handle, (uint8_t)5,
+				      (uint8_t)0, (uint16_t)0, (uint16_t)0,
+				      buf, 2, DEVTIMEOUT);
 	ret = buf[0] & FTDI_STATUS_B0_MASK;
 	return (ret & FTDI_RS0_CTS);
 }
