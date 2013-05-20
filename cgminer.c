@@ -2215,6 +2215,14 @@ void clear_logwin(void)
 		unlock_curses();
 	}
 }
+
+void logwin_update(void)
+{
+	if (curses_active_locked()) {
+		touchwin(logwin);
+		wrefresh(logwin);
+	}
+}
 #endif
 
 static void enable_pool(struct pool *pool)
@@ -2804,10 +2812,14 @@ static void __kill_work(void)
 	applog(LOG_DEBUG, "Killing off mining threads");
 	/* Kill the mining threads*/
 	for (i = 0; i < mining_threads; i++) {
+		pthread_t *pth = NULL;
+
 		thr = get_thread(i);
+		if (thr && PTH(thr) != 0L)
+			pth = &thr->pth;
 		thr_info_cancel(thr);
-		if (thr && thr->pth)
-			pthread_join(thr->pth, NULL);
+		if (pth)
+			pthread_join(*pth, NULL);
 	}
 
 	applog(LOG_DEBUG, "Killing off stage thread");
@@ -4111,6 +4123,7 @@ retry:
 	wlogprint("[A]dd pool [R]emove pool [D]isable pool [E]nable pool\n");
 	wlogprint("[C]hange management strategy [S]witch pool [I]nformation\n");
 	wlogprint("Or press any other key to continue\n");
+	logwin_update();
 	input = getch();
 
 	if (!strncasecmp(&input, "a", 1)) {
@@ -4233,6 +4246,7 @@ retry:
 		opt_compact ? "on" : "off",
 		opt_log_interval);
 	wlogprint("Select an option or any other key to return\n");
+	logwin_update();
 	input = getch();
 	if (!strncasecmp(&input, "q", 1)) {
 		opt_quiet ^= true;
@@ -4341,6 +4355,7 @@ retry:
 		  "[W]rite config file\n[C]gminer restart\n",
 		opt_queue, opt_scantime, opt_expiry);
 	wlogprint("Select an option or any other key to return\n");
+	logwin_update();
 	input = getch();
 
 	if (!strncasecmp(&input, "q", 1)) {
