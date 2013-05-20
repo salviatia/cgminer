@@ -899,7 +899,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 {
 	struct cgpu_info *avalon;
 	struct work **works;
-	int ret = AVA_GETS_OK, full;
+	int ret = AVA_GETS_OK;
 
 	struct avalon_info *info;
 	struct avalon_task at;
@@ -912,6 +912,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	uint32_t nonce;
 	int64_t hash_count;
 	int result_wrong;
+	int timeouts = 0;
 
 	avalon = thr->cgpu;
 	works = avalon->works;
@@ -960,6 +961,11 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			timersub(&tv_finish, &tv_start, &elapsed);
 			applog(LOG_DEBUG, "Avalon: no nonce in (%ld.%06lds)",
 			       elapsed.tv_sec, elapsed.tv_usec);
+			timeouts++;
+			if (timeouts > 4000 / info->frequency) {
+				applog(LOG_DEBUG, "Avalon: Not looking for more nonces");
+				break;
+			}
 			continue;
 		}
 
