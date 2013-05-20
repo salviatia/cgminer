@@ -351,8 +351,12 @@ retry:
 		if (++tries < 2)
 			goto retry;
 		/* FIXME: return 1; */
-	} else
+	} else {
 		applog(LOG_WARNING, "Avalon: Reset succeeded");
+		/* If the reset went according to plan, we can read off the
+		 * actual miner_num. */
+		avalon_infos[avalon->device_id]->miner_count = ar.miner_num;
+	}
 	return 0;
 }
 
