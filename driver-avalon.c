@@ -217,7 +217,7 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 	int ret, err;
 
 	while (true) {
-		if (unlikely(thr->work_restart)) {
+		if (unlikely(thr && thr->work_restart)) {
 			applog(LOG_DEBUG, "Avalon: Work restart");
 			return AVA_GETS_RESTART;
 		}
@@ -384,7 +384,7 @@ static void avalon_idle(struct cgpu_info *avalon)
 		}
 	}
 	applog(LOG_ERR, "Avalon: Goto idle mode");
-	avalon_get_result(avalon, &ar, avalon->thr[0], &max_ms);
+	avalon_get_result(avalon, &ar, NULL, &max_ms);
 }
 
 static void get_options(int this_option_offset, int *baud, int *miner_count,
