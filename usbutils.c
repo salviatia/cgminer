@@ -2048,7 +2048,7 @@ int usb_ftdi_cts(struct cgpu_info *cgpu)
 	unsigned char buf[2], ret;
 
 	libusb_control_transfer(usbdev->handle, (uint8_t)FTDI_TYPE_IN,
-				      (uint8_t)0, (uint16_t)0, (uint16_t)0,
+				      (uint8_t)5, (uint16_t)0, (uint16_t)0,
 				      buf, 2, DEVTIMEOUT);
 	ret = buf[0] & FTDI_STATUS_B0_MASK;
 	return (ret & FTDI_RS0_CTS);
