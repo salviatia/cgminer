@@ -318,21 +318,15 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 
 static int avalon_reset(struct cgpu_info *avalon)
 {
-	struct avalon_task at;
 	struct avalon_result ar;
 	uint8_t *buf;
-	int ret, i = 0;
+	int err, i = 0, amount;
 	struct timespec p;
 
-	avalon_init_task(&at, 1, 0,
-			 AVALON_DEFAULT_FAN_MAX_PWM,
-			 AVALON_DEFAULT_TIMEOUT,
-			 AVALON_DEFAULT_ASIC_NUM,
-			 AVALON_DEFAULT_MINER_NUM,
-			 0, 0,
-			 AVALON_DEFAULT_FREQUENCY);
-	ret = avalon_send_task(&at, avalon);
-	if (ret == AVA_SEND_ERROR)
+	err = usb_write(avalon, "ad", 2, &amount, C_AVALON_RESET);
+	applog(LOG_DEBUG, "%s%i: avalon reset got err %d",
+	       avalon->drv->name, avalon->device_id, err);
+	if (err != 0)
 		return 1;
 
 	avalon_get_reset(avalon, &ar);

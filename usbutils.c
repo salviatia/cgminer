@@ -324,6 +324,7 @@ static const char *C_QUEFLUSHREPLY_S = "QueFlushReply";
 static const char *C_REQUESTVOLTS_S = "RequestVolts";
 static const char *C_AVALON_TASK_S = "AvalonTask";
 static const char *C_GET_AVALON_READY_S = "AvalonReady";
+static const char *C_AVALON_RESET_S = "AvalonReset";
 static const char *C_GET_AR_S = "AvalonResult";
 static const char *C_FTDI_STATUS_S = "FTDIStatus";
 
@@ -797,6 +798,7 @@ static void cgusb_check_init()
 		usb_commands[C_REQUESTVOLTS] = C_REQUESTVOLTS_S;
 		usb_commands[C_AVALON_TASK] = C_AVALON_TASK_S;
 		usb_commands[C_GET_AVALON_READY] = C_GET_AVALON_READY_S;
+		usb_commands[C_AVALON_RESET] = C_AVALON_RESET_S;
 		usb_commands[C_GET_AR] = C_GET_AR_S;
 		usb_commands[C_FTDI_STATUS] = C_FTDI_STATUS_S;
 
