@@ -235,7 +235,7 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 			if (!ret && read_amount == AVALON_READ_SIZE)
 				return AVA_GETS_TIMEOUT;
 		}
-		if (err) {
+		if (err != LIBUSB_ERROR_TIMEOUT) {
 			applog(LOG_ERR, "Avalon: Error %d on usb read in avalon_gets", err);
 			return AVA_GETS_ERROR;
 		}
