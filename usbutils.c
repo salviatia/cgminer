@@ -2076,6 +2076,16 @@ int usb_ftdi_err(struct cgpu_info *cgpu)
 	return (buf[1] & FTDI_RS_ERR_MASK);
 }
 
+void clear_ftdi_status(struct cgpu_info *cgpu)
+{
+	struct cg_usb_device *usbdev = cgpu->usbdev;
+	unsigned char buf[2];
+
+	libusb_control_transfer(usbdev->handle, (uint8_t)FTDI_TYPE_IN,
+				(uint8_t)5, (uint16_t)0, (uint16_t)0, buf, 2,
+				DEVTIMEOUT);
+}
+
 int _usb_write(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *processed, unsigned int timeout, enum usb_cmds cmd)
 {
 	struct cg_usb_device *usbdev = cgpu->usbdev;
