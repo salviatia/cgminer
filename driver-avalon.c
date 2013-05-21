@@ -267,10 +267,12 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 	abstime.tv_nsec = then.tv_usec * 1000;
 
 	mutex_lock(&info->read_mutex);
-	ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
-	if (ret) {
-		ret = AVA_GETS_TIMEOUT;
-		goto out_unlock;
+	if (info->offset < AVALON_READ_SIZE) {
+		ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
+		if (ret) {
+			ret = AVA_GETS_TIMEOUT;
+			goto out_unlock;
+		}
 	}
 	memcpy(ar, info->readbuf, AVALON_READ_SIZE);
 	info->offset -= AVALON_READ_SIZE;
