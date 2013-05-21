@@ -192,10 +192,8 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
-	clear_ftdi_status(avalon);
 	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
 			C_AVALON_TASK);
-	clear_ftdi_status(avalon);
 
 	applog(LOG_DEBUG, "%s%i: usb_write got err %d",
 	       avalon->drv->name, avalon->device_id, err);
@@ -366,9 +364,7 @@ static int avalon_reset(struct cgpu_info *avalon)
 	struct timespec p;
 
 	avalon_wait_ready(avalon);
-	clear_ftdi_status(avalon);
 	err = usb_write(avalon, "ad", 2, &amount, C_AVALON_RESET);
-	clear_ftdi_status(avalon);
 	applog(LOG_DEBUG, "%s%i: avalon reset got err %d",
 	       avalon->drv->name, avalon->device_id, err);
 	if (err != 0)
