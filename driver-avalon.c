@@ -334,6 +334,10 @@ static void avalon_clear_readbuf(struct cgpu_info *avalon)
 		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
 		       avalon->drv->name, avalon->device_id, err);
 	} while (amount > 2);
+
+	err = usb_transfer(avalon, FTDI_TYPE_OUT, FTDI_REQUEST_RESET,
+			   FTDI_VALUE_PURGE_RX, avalon->usbdev->found->interface,
+			   C_PURGERX);
 }
 
 static int avalon_reset(struct cgpu_info *avalon)
