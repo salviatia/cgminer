@@ -267,7 +267,7 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 	abstime.tv_nsec = then.tv_usec * 1000;
 
 	mutex_lock(&info->read_mutex);
-	if (info->offset < AVALON_READ_SIZE) {
+	if (info->offset < AVALON_READ_SIZE || !info->aligned) {
 		ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
 		if (ret) {
 			ret = AVA_GETS_TIMEOUT;
@@ -712,6 +712,8 @@ static void avalon_reinit(struct cgpu_info *avalon)
 
 static bool __aligned_readbuf(struct avalon_info *info)
 {
+	uint8_t miner_num = info->miner_count;
+
 	if (info->aligned)
 		return true;
 
@@ -721,7 +723,6 @@ static bool __aligned_readbuf(struct avalon_info *info)
 	}
 
 	while (info->offset > AVALON_READ_SIZE) {
-		uint8_t miner_num = info->miner_count;
 		size_t offset, tmp_offset = 0;
 		char *mn;
 
