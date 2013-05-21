@@ -835,7 +835,7 @@ static void avalon_rotate_array(struct cgpu_info *avalon)
 
 static int64_t avalon_scanhash(struct thr_info *thr)
 {
-	struct cgpu_info *avalon;
+	struct cgpu_info *avalon = thr->cgpu;
 	struct work **works;
 	int ret = AVA_GETS_OK;
 
@@ -850,9 +850,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	uint32_t nonce;
 	int64_t hash_count;
 	int result_wrong, max_ms;
-	bool full = false;
+	bool full = avalon_buffer_full(avalon);
 
-	avalon = thr->cgpu;
 	works = avalon->works;
 	info = avalon_infos[avalon->device_id];
 	avalon_get_work_count = info->miner_count;
