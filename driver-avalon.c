@@ -294,7 +294,7 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 		copied = info->offset;
 	spare = copied - AVALON_READ_SIZE;
 
-	for (offset = 0; offset < spare; offset++) {
+	for (offset = 0; offset <= spare; offset++) {
 		if (avalon_valid_ar(avalon, (struct avalon_result *)&info->readbuf[offset])) {
 			found = true;
 			break;
