@@ -251,13 +251,23 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 	}
 }
 
+#define DOUBLE_AR (AVALON_READ_SIZE * 2)
+
+static bool avalon_valid_ar(struct cgpu_info *avalon, struct avalon_result *ar)
+{
+	return (!!(find_queued_work_bymidstate(avalon, (char *)ar->midstate, 32,
+					       (char *)ar->data, 64, 12)));
+}
+
 static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			     int *max_timeout)
 {
 	struct avalon_info *info = avalon_infos[avalon->device_id];;
 	struct timeval now, then, tdiff;
+	size_t copied, spare, offset;
+	int ret = AVA_GETS_ERROR;
 	struct timespec abstime;
-	int ret;
+	bool found = false;
 
 	cgtime(&now);
 	tdiff.tv_sec = *max_timeout / 1000;
@@ -265,6 +275,8 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 	timeradd(&now, &tdiff, &then);
 	abstime.tv_sec = then.tv_sec;
 	abstime.tv_nsec = then.tv_usec * 1000;
+
+	memset(ar, 0, sizeof(struct avalon_result));
 
 	mutex_lock(&info->read_mutex);
 	if (info->offset < AVALON_READ_SIZE) {
@@ -274,9 +286,33 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			goto out_unlock;
 		}
 	}
-	memcpy(ar, info->readbuf, AVALON_READ_SIZE);
-	info->offset -= AVALON_READ_SIZE;
-	memmove(info->readbuf, &info->readbuf[AVALON_READ_SIZE], info->offset);
+	if (info->offset > DOUBLE_AR)
+		copied = DOUBLE_AR;
+	else
+		copied = info->offset;
+	spare = info->offset - copied;
+
+	for (offset = 0; offset < spare; offset++) {
+		if (avalon_valid_ar(avalon, (struct avalon_result *)&info->readbuf[offset])) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		/* Only offset if we have tried 2 full AR's worth */
+		if (copied == DOUBLE_AR) {
+			applog(LOG_DEBUG, "Avalon: No valid work found");
+			info->offset -= AVALON_READ_SIZE;
+			memmove(info->readbuf, &info->readbuf[AVALON_READ_SIZE], info->offset);
+		}
+		goto out_unlock;
+	}
+
+	copied = AVALON_READ_SIZE + offset;
+	memcpy(ar, &info->readbuf[offset], AVALON_READ_SIZE);
+	info->offset -= copied;
+	memmove(info->readbuf, &info->readbuf[copied], info->offset);
 	if (opt_debug) {
 		applog(LOG_DEBUG, "Avalon: get:");
 		hexdump((uint8_t *)ar, AVALON_READ_SIZE);
@@ -972,8 +1008,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		if (unlikely(ret == AVA_GETS_ERROR)) {
 			applog(LOG_ERR,
 			       "AVA%i: Comms error(read)", avalon->device_id);
-			dev_error(avalon, REASON_DEV_COMMS_ERROR);
-			break;
+			//dev_error(avalon, REASON_DEV_COMMS_ERROR);
+			continue;
 		}
 
 		decoded = avalon_decode_nonce(thr, &ar, &nonce);
