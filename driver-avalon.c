@@ -686,9 +686,6 @@ static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found
 		 * return false; */
 	}
 
-	/* Set asic to idle mode after detect */
-	avalon_idle(avalon);
-
 	return true;
 }
 
@@ -700,13 +697,14 @@ static void avalon_detect(void)
 static void avalon_init(struct cgpu_info *avalon)
 {
 	applog(LOG_INFO, "Avalon: Opened on %s", avalon->device_path);
+	avalon_idle(avalon);
+	avalon_clear_readbuf(avalon);
 }
 
 static void avalon_reinit(struct cgpu_info *avalon)
 {
 	avalon_initialise(avalon);
 	avalon_reset(avalon);
-	avalon_idle(avalon);
 }
 
 static void *avalon_get_results(void *userdata)
@@ -715,7 +713,11 @@ static void *avalon_get_results(void *userdata)
 	struct avalon_info *info = avalon_infos[avalon->device_id];
 	const int rsize = 512;
 
+	/* This lock prevents the reads from starting till avalon_prepare
+	 * releses it */
+	mutex_lock(&info->read_mutex);
 	info->offset = 0;
+	mutex_unlock(&info->read_mutex);
 
 	while (42) {
 		int amount, err;
@@ -760,14 +762,15 @@ static bool avalon_prepare(struct thr_info *thr)
 		quit(1, "Failed to calloc avalon works in avalon_prepare");
 
 	mutex_init(&info->read_mutex);
+	mutex_lock(&info->read_mutex);
 	if (unlikely(pthread_cond_init(&info->read_cond, NULL)))
 		quit(1, "Failed to pthread_cond_init avalon read_cond");
-	avalon_clear_readbuf(avalon);
 
 	if (pthread_create(&info->read_thr, NULL, avalon_get_results, (void *)avalon))
 		quit(1, "Failed to create avalon read_thr");
 
 	avalon_init(avalon);
+	mutex_unlock(&info->read_mutex);
 
 	cgtime(&now);
 	get_datestamp(avalon->init, &now);
