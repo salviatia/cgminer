@@ -608,10 +608,23 @@ static inline void avalon_detect_serial(void)
 }
 #endif
 
+static void avalon_clear_results(struct cgpu_info *avalon)
+{
+	char buf[AVALON_READ_SIZE];
+	int amount, err;
+
+	do {
+		err = usb_ftdi_read_timeout(avalon, buf, AVALON_READ_SIZE,
+					    &amount, 50, C_GET_AVALON_READY);
+
+		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
+		       avalon->drv->name, avalon->device_id, err);
+	} while (amount == AVALON_READ_SIZE);
+}
+
 static void avalon_initialise(struct cgpu_info *avalon)
 {
-	int err, interface, amount;
-	char buf;
+	int err, interface;
 
 	if (avalon->usbinfo.nodev)
 		return;
@@ -668,10 +681,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 	if (avalon->usbinfo.nodev)
 		return;
 
-	err = usb_ftdi_read_timeout(avalon, &buf, 1, &amount, 100, C_GET_AVALON_READY);
-
-	applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
-	       avalon->drv->name, avalon->device_id, err);
+	avalon_clear_results(avalon);
 }
 
 static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found)
