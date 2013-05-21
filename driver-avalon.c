@@ -708,6 +708,32 @@ static void avalon_reinit(struct cgpu_info *avalon)
 	avalon_reset(avalon);
 }
 
+static bool __aligned_readbuf(struct avalon_info *info)
+{
+	if (info->aligned)
+		return true;
+
+	while (info->offset > AVALON_READ_SIZE) {
+		int miner_num = info->miner_count;
+		size_t offset;
+		char *mn;
+
+		mn = memchr(info->readbuf, miner_num, info->offset);
+		if (!mn)
+			return false;
+		offset = mn - info->readbuf;
+		if (offset == AVALON_READ_SIZE - 1) {
+			info->aligned = true;
+			return true;
+		}
+		if (info->offset <= offset)
+			return false;
+		info->offset -= offset;
+		memmove(info->readbuf, &info->readbuf[offset + 1], info->offset);
+	}
+	return false;
+}
+
 static void *avalon_get_results(void *userdata)
 {
 	struct cgpu_info *avalon = (struct cgpu_info *)userdata;
@@ -718,6 +744,7 @@ static void *avalon_get_results(void *userdata)
 	 * releses it */
 	mutex_lock(&info->read_mutex);
 	info->offset = 0;
+	info->aligned = false;
 	mutex_unlock(&info->read_mutex);
 
 	while (42) {
@@ -743,7 +770,7 @@ static void *avalon_get_results(void *userdata)
 		mutex_lock(&info->read_mutex);
 		memcpy(&info->readbuf[info->offset], &buf[2], amount);
 		info->offset += amount;
-		if (info->offset >= AVALON_READ_SIZE)
+		if (info->offset >= AVALON_READ_SIZE && __aligned_readbuf(info))
 			pthread_cond_broadcast(&info->read_cond);
 		mutex_unlock(&info->read_mutex);
 	}
