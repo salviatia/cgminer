@@ -330,7 +330,7 @@ static void avalon_clear_readbuf(struct cgpu_info *avalon)
 	char buf[512];
 
 	do {
-		err = usb_ftdi_read_timeout(avalon, buf, 512, &amount, 50,
+		err = usb_ftdi_read_timeout(avalon, buf, 496, &amount, 50,
 					    C_GET_AVALON_READY);
 
 		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
@@ -401,6 +401,7 @@ static void avalon_idle(struct cgpu_info *avalon)
 		}
 	}
 	applog(LOG_WARNING, "Avalon: Goto idle mode");
+	avalon_clear_readbuf(avalon);
 	/* No chips should be returning responses after 2 seconds */
 	sleep(2);
 	avalon_clear_readbuf(avalon);
