@@ -713,6 +713,11 @@ static bool __aligned_readbuf(struct avalon_info *info)
 	if (info->aligned)
 		return true;
 
+	if (opt_debug) {
+		applog(LOG_DEBUG, "Avalon: Misaligned buffer:");
+		hexdump((uint8_t *)info->readbuf, AVALON_READ_SIZE);
+	}
+
 	while (info->offset > AVALON_READ_SIZE) {
 		int miner_num = info->miner_count;
 		size_t offset;
@@ -724,6 +729,10 @@ static bool __aligned_readbuf(struct avalon_info *info)
 		offset = mn - info->readbuf;
 		if (offset == AVALON_READ_SIZE - 1) {
 			info->aligned = true;
+			if (opt_debug) {
+				applog(LOG_DEBUG, "Avalon: Realigned buffer:");
+				hexdump((uint8_t *)info->readbuf, AVALON_READ_SIZE);
+			}
 			return true;
 		}
 		if (info->offset <= offset)
