@@ -791,9 +791,12 @@ static void *avalon_get_results(void *userdata)
 		if (err) {
 			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
 			       avalon->drv->name, avalon->device_id, err);
+			nmsleep(8);
+			continue;
 		}
 
-		info->buffer_full = !!(buf[0] & FTDI_RS0_CTS);
+		/* Set out of lock but it's a simple bool */
+		info->buffer_full = !(buf[0] & FTDI_RS0_CTS);
 		amount -= 2;
 		if (amount < 1) {
 			nmsleep(8);
