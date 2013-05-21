@@ -716,6 +716,7 @@ static void *avalon_get_results(void *userdata)
 {
 	struct cgpu_info *avalon = (struct cgpu_info *)userdata;
 	struct avalon_info *info = avalon_infos[avalon->device_id];
+	struct cg_usb_device *usbdev = avalon->usbdev;
 	const int rsize = 512;
 
 	/* This lock prevents the reads from starting till avalon_prepare
@@ -726,7 +727,7 @@ static void *avalon_get_results(void *userdata)
 
 	while (42) {
 		int amount, err;
-		char buf[rsize];
+		unsigned char buf[rsize];
 
 		if (unlikely(info->offset + rsize >= AVALON_READBUF_SIZE)) {
 			applog(LOG_ERR, "Avalon readbuf overflow, resetting buffer");
@@ -735,8 +736,9 @@ static void *avalon_get_results(void *userdata)
 			mutex_unlock(&info->read_mutex);
 		}
 
-		err = usb_read_once_timeout(avalon, buf, 512, &amount,
-					    AVALON_READ_TIMEOUT, C_AVALON_READ);
+		err = libusb_bulk_transfer(usbdev->handle,
+					   usbdev->found->eps[C_AVALON_READ].ep,
+					   buf, 512, &amount, AVALON_READ_TIMEOUT);
 		if (err) {
 			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
 			       avalon->drv->name, avalon->device_id, err);
