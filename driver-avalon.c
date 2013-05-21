@@ -783,17 +783,17 @@ static void *avalon_get_results(void *userdata)
 		applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
 		       avalon->drv->name, avalon->device_id, err);
 		amount -= 2;
-		if (amount < 1) {
-			nmsleep(8);
-			continue;
-		}
 
 		mutex_lock(&info->read_mutex);
-		memcpy(&info->readbuf[info->offset], &buf[2], amount);
-		info->offset += amount;
+		if (amount > 0) {
+			memcpy(&info->readbuf[info->offset], &buf[2], amount);
+			info->offset += amount;
+		}
 		if (info->offset >= AVALON_READ_SIZE && __aligned_readbuf(info))
 			pthread_cond_broadcast(&info->read_cond);
 		mutex_unlock(&info->read_mutex);
+		if (!amount)
+			nmsleep(8);
 	}
 	return NULL;
 }
