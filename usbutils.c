@@ -1950,7 +1950,7 @@ int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *pro
 
 			timeout = initial_timeout - (done * 1000);
 			/* The buffer is only filled every 16ms on ftdi */
-			if (ftdi && bufleft > 0)
+			if (ftdi && bufleft > 0 && bufleft < 63)
 				nmsleep(16);
 		}
 
