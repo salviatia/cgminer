@@ -1018,7 +1018,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			applog(LOG_ERR,
 			       "AVA%i: Comms error(read)", avalon->device_id);
 			//dev_error(avalon, REASON_DEV_COMMS_ERROR);
-			continue;
+			return 0;
 		}
 
 		decoded = avalon_decode_nonce(thr, &ar, &nonce);
@@ -1030,7 +1030,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		if (ret == AVA_GETS_TIMEOUT || max_ms <= 0) {
 			timersub(&tv_finish, &tv_start, &elapsed);
 			applog(LOG_DEBUG,
-			       "Avalon: 0x%08llx hashes　(%ld.%06lds)",
+			       "Avalon: 0x%08llx hashes (%ld.%06lds)",
 			       (unsigned long long)hash_count,
 			       elapsed.tv_sec, elapsed.tv_usec);
 			applog(LOG_DEBUG, "Avalon: Not looking for more nonces");
