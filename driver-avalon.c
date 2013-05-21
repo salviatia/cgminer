@@ -348,7 +348,7 @@ static void avalon_clear_readbuf(struct cgpu_info *avalon)
 	char buf[512];
 
 	do {
-		err = usb_ftdi_read_timeout(avalon, buf, 496, &amount, 50,
+		err = usb_ftdi_read_timeout(avalon, buf, 510, &amount, 50,
 					    C_GET_AVALON_READY);
 
 		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
@@ -697,6 +697,7 @@ static void avalon_detect(void)
 static void avalon_init(struct cgpu_info *avalon)
 {
 	applog(LOG_INFO, "Avalon: Opened on %s", avalon->device_path);
+	avalon_clear_readbuf(avalon);
 	avalon_idle(avalon);
 	avalon_clear_readbuf(avalon);
 }
