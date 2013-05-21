@@ -191,6 +191,7 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
+	clear_ftdi_status(avalon);
 	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
 			C_AVALON_TASK);
 	clear_ftdi_status(avalon);
@@ -223,6 +224,7 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 			return AVA_GETS_RESTART;
 		}
 
+		clear_ftdi_status(avalon);
 		cgtime(&tv_before);
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
 					    timeout, C_GET_AR);
@@ -304,6 +306,7 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	memset(result, 0, AVALON_READ_SIZE);
 	memset(ar, 0, AVALON_READ_SIZE);
 
+	clear_ftdi_status(avalon);
 	err = usb_ftdi_read_timeout(avalon, result, AVALON_READ_SIZE, &amount,
 				    2000, C_GET_AR);
 	clear_ftdi_status(avalon);
@@ -331,6 +334,7 @@ static void avalon_clear_readbuf(struct cgpu_info *avalon)
 	char buf[512];
 
 	do {
+		clear_ftdi_status(avalon);
 		err = usb_read_once_timeout(avalon, buf, 512, &amount, 50,
 					    C_GET_AVALON_READY);
 		clear_ftdi_status(avalon);
@@ -348,6 +352,7 @@ static int avalon_reset(struct cgpu_info *avalon)
 	struct timespec p;
 
 	avalon_wait_ready(avalon);
+	clear_ftdi_status(avalon);
 	err = usb_write(avalon, "ad", 2, &amount, C_AVALON_RESET);
 	clear_ftdi_status(avalon);
 	applog(LOG_DEBUG, "%s%i: avalon reset got err %d",
