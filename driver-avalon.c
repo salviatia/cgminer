@@ -251,8 +251,6 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 	}
 }
 
-#define DOUBLE_AR (AVALON_READ_SIZE * 2)
-
 static bool avalon_valid_ar(struct cgpu_info *avalon, struct avalon_result *ar)
 {
 	return (!!(find_queued_work_bymidstate(avalon, (char *)ar->midstate, 32,
@@ -288,10 +286,8 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			}
 		} while (info->offset < AVALON_READ_SIZE);
 	}
-	if (info->offset > DOUBLE_AR)
-		copied = DOUBLE_AR;
-	else
-		copied = info->offset;
+
+	copied = info->offset;
 	spare = copied - AVALON_READ_SIZE;
 
 	for (offset = 0; offset <= spare; offset++) {
@@ -308,7 +304,7 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 		}
 
 		/* Only offset if we have tried 2 full AR's worth */
-		if (copied == DOUBLE_AR) {
+		if (copied >= AVALON_READ_SIZE * 2) {
 			applog(LOG_DEBUG, "Avalon: No valid work found");
 			info->offset -= AVALON_READ_SIZE;
 			memcpy(ar, info->readbuf, AVALON_READ_SIZE);
@@ -319,6 +315,10 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 		goto out_unlock;
 	}
 
+	if (offset) {
+		applog(LOG_WARNING, "Avalon: Discarded %u bytes from read buffer",
+		       (unsigned int)offset);
+	}
 	info->aligned = true;
 	copied = AVALON_READ_SIZE + offset;
 	memcpy(ar, &info->readbuf[offset], AVALON_READ_SIZE);
