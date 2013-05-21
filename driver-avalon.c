@@ -717,6 +717,11 @@ static bool __aligned_readbuf(struct avalon_info *info)
 	if (info->aligned)
 		return true;
 
+	if (!memcmp(&info->readbuf[AVALON_READ_SIZE - 1], &miner_num, 1)) {
+		info->aligned = true;
+		return true;
+	}
+
 	if (opt_debug) {
 		applog(LOG_DEBUG, "Avalon: Misaligned buffer:");
 		hexdump((uint8_t *)info->readbuf, AVALON_READ_SIZE);
