@@ -322,16 +322,20 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 
 static void avalon_clear_readbuf(struct cgpu_info *avalon)
 {
+	int amount, err, timeout;
 	char buf[512];
-	int amount, err;
 
 	do {
-		err = usb_read_once_timeout(avalon, buf, 512, &amount, 1,
+		if (usb_ftdi_err(avalon))
+			timeout = 50;
+		else
+			timeout = 1;
+		err = usb_read_once_timeout(avalon, buf, 512, &amount, timeout,
 					    C_GET_AVALON_READY);
 
 		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
 		       avalon->drv->name, avalon->device_id, err);
-	} while (amount > 2);
+	} while (amount > 2 && !usb_ftdi_err(avalon));
 }
 
 static int avalon_reset(struct cgpu_info *avalon)
