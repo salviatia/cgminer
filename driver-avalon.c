@@ -849,6 +849,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	uint32_t nonce;
 	int64_t hash_count;
 	int result_wrong, max_ms;
+	bool full = false;
 
 	avalon = thr->cgpu;
 	works = avalon->works;
@@ -860,6 +861,9 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	start_count = avalon->work_array * avalon_get_work_count;
 	end_count = start_count + avalon_get_work_count;
 	for (i = start_count; i < end_count; i++) {
+		if (full)
+			break;
+
 		avalon_init_task(&at, 0, 0, info->fan_pwm,
 				 info->timeout, info->asic_count,
 				 info->miner_count, 1, 0, info->frequency);
@@ -878,6 +882,14 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		}
 
 		works[i]->blk.nonce = 0xffffffff;
+		full = avalon_buffer_full(avalon);
+	}
+
+	if (!full) {
+		applog(LOG_DEBUG, "AVA%i: One set of submits without full buffer",
+		       avalon->device_id);
+		avalon_rotate_array(avalon);
+		return 0xffffffff;
 	}
 
 	elapsed.tv_sec = elapsed.tv_usec = 0;
