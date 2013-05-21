@@ -1893,9 +1893,13 @@ int _usb_read(struct cgpu_info *cgpu, int ep, char *buf, size_t bufsiz, int *pro
 		max = ((double)timeout) / 1000.0;
 		cgtime(&read_start);
 		while (bufleft > 0) {
-			if (ftdi)
+			if (ftdi) {
 				usbbufread = bufleft + 2;
-			else
+				/* Due to strange buffering, precisely 64 bytes
+				 * can get stuck in an ftdi device. */
+				if (!(usbbufread % 64))
+					usbbufread -= 32;
+			} else
 				usbbufread = bufleft;
 			got = 0;
 			STATS_TIMEVAL(&tv_start);
