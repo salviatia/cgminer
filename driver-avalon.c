@@ -280,11 +280,13 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 
 	mutex_lock(&info->read_mutex);
 	if (info->offset < AVALON_READ_SIZE || !info->aligned) {
-		ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
-		if (ret) {
-			ret = AVA_GETS_TIMEOUT;
-			goto out_unlock;
-		}
+		do {
+			ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
+			if (ret) {
+				ret = AVA_GETS_TIMEOUT;
+				goto out_unlock;
+			}
+		} while (info->offset < AVALON_READ_SIZE);
 	}
 	if (info->offset > DOUBLE_AR)
 		copied = DOUBLE_AR;
