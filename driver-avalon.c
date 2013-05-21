@@ -326,8 +326,8 @@ static void avalon_clear_readbuf(struct cgpu_info *avalon)
 	int amount, err;
 
 	do {
-		err = usb_read_timeout(avalon, buf, 512, &amount, 1,
-				       C_GET_AVALON_READY);
+		err = usb_read_once_timeout(avalon, buf, 512, &amount, 1,
+					    C_GET_AVALON_READY);
 
 		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
 		       avalon->drv->name, avalon->device_id, err);
