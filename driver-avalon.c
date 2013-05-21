@@ -387,7 +387,6 @@ static void avalon_idle(struct cgpu_info *avalon)
 	struct avalon_info *info = avalon_infos[avalon->device_id];
 	int avalon_get_work_count = info->miner_count;
 
-	avalon_wait_ready(avalon);
 	for (i = 0; i < avalon_get_work_count; i++) {
 		avalon_init_task(&at, 0, 0, info->fan_pwm,
 				 info->timeout, info->asic_count,
