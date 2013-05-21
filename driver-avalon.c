@@ -772,8 +772,10 @@ static void *avalon_get_results(void *userdata)
 		}
 
 		err = usb_read_once(avalon, buf, 512, &amount, C_AVALON_READ);
-		applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
-		       avalon->drv->name, avalon->device_id, err);
+		if (err) {
+			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
+			       avalon->drv->name, avalon->device_id, err);
+		}
 		amount -= 2;
 		if (amount < 1) {
 			nmsleep(8);
