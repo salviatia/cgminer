@@ -307,15 +307,6 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			applog(LOG_DEBUG, "Avalon: No Valid:");
 			hexdump((uint8_t *)info->readbuf, copied);
 		}
-
-		/* Only offset if we have tried 2 full AR's worth */
-		if (copied >= AVALON_READ_SIZE * 2) {
-			applog(LOG_DEBUG, "Avalon: No valid work found");
-			info->offset -= AVALON_READ_SIZE;
-			memcpy(ar, info->readbuf, AVALON_READ_SIZE);
-			memmove(info->readbuf, &info->readbuf[AVALON_READ_SIZE], info->offset);
-			ret = AVA_GETS_OK;
-		}
 		info->aligned = false;
 		goto out_unlock;
 	}
