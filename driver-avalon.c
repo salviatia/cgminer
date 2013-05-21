@@ -213,49 +213,6 @@ static int avalon_send_task(const struct avalon_task *at,
 	return AVA_SEND_OK;
 }
 
-static inline int
-avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
-	    int *max_timeout)
-{
-	struct timeval tv_before, tv_after, tv_diff;
-	int read_amount = AVALON_READ_SIZE;
-	const unsigned int timeout = 50;
-	int ret, err;
-
-	while (true) {
-		if (unlikely(thr && thr->work_restart)) {
-			applog(LOG_DEBUG, "Avalon: Work restart");
-			return AVA_GETS_RESTART;
-		}
-
-		cgtime(&tv_before);
-		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
-					    timeout, C_GET_AR);
-		cgtime(&tv_after);
-		timersub(&tv_after, &tv_before, &tv_diff);
-		*max_timeout -= tv_diff.tv_sec * 1000;
-		*max_timeout -= tv_diff.tv_usec / 1000;
-
-		if (!ret && read_amount == AVALON_READ_SIZE) {
-			/* No data read yet. */
-			if (*max_timeout <= 0)
-				return AVA_GETS_TIMEOUT;
-			if (!avalon_buffer_full(avalon))
-				return AVA_BUFFER_EMPTY;
-		}
-
-		if (err && err != LIBUSB_ERROR_TIMEOUT) {
-			applog(LOG_ERR, "Avalon: Error %d on usb read in avalon_gets", err);
-			return AVA_GETS_ERROR;
-		}
-
-		if (likely(ret >= read_amount))
-			return AVA_GETS_OK;
-		buf += ret;
-		read_amount -= ret;
-	}
-}
-
 static bool avalon_valid_ar(struct cgpu_info *avalon, struct avalon_result *ar)
 {
 	return (!!(find_queued_work_bymidstate(avalon, (char *)ar->midstate, 32,
