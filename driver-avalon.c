@@ -191,7 +191,6 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
-	avalon_wait_ready(avalon);
 	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
 			C_AVALON_TASK);
 
@@ -881,6 +880,9 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	hash_count = 0;
 	while (true) {
 		bool decoded;
+
+		if (!avalon_buffer_full(avalon))
+			break;
 
 		ret = avalon_get_result(avalon, &ar, thr, &max_ms);
 		cgtime(&tv_finish);
