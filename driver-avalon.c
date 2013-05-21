@@ -721,14 +721,20 @@ static bool __aligned_readbuf(struct avalon_info *info)
 	}
 
 	while (info->offset > AVALON_READ_SIZE) {
-		int miner_num = info->miner_count;
-		size_t offset;
+		uint8_t miner_num = info->miner_count;
+		size_t offset, tmp_offset = 0;
 		char *mn;
 
-		mn = memchr(info->readbuf, miner_num, info->offset);
-		if (!mn)
-			return false;
-		offset = mn - info->readbuf;
+		while (42) {
+			mn = memchr(&info->readbuf[tmp_offset], miner_num, info->offset);
+			if (!mn)
+				return false;
+			offset = mn - info->readbuf;
+			if (offset + AVALON_READ_SIZE > info->offset)
+				return false;
+			if (!memcmp(&info->readbuf[offset + AVALON_READ_SIZE], &miner_num, 1))
+				break;
+		}
 		if (offset == AVALON_READ_SIZE - 1) {
 			info->aligned = true;
 			if (opt_debug) {
