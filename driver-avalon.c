@@ -384,14 +384,11 @@ static void avalon_idle(struct cgpu_info *avalon)
 	struct avalon_task at;
 	int i, ret;
 
-	for (i = 0; i < avalon_get_work_count * 2; i++) {
+	for (i = 0; i < avalon_get_work_count; i++) {
 		avalon_init_task(&at, 0, 0, info->fan_pwm,
 				 info->timeout, info->asic_count,
 				 info->miner_count, 1, 1, info->frequency);
 		ret = avalon_send_task(&at, avalon);
-		if (avalon_buffer_full(avalon))
-			break;
-
 		if (unlikely(ret == AVA_SEND_ERROR)) {
 			applog(LOG_ERR, "AVA%i: Comms error", avalon->device_id);
 			return;
