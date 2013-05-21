@@ -737,7 +737,7 @@ static void *avalon_get_results(void *userdata)
 		}
 
 		err = libusb_bulk_transfer(usbdev->handle,
-					   usbdev->found->eps[C_AVALON_READ].ep,
+					   usbdev->found->eps[DEFAULT_EP_IN].ep,
 					   buf, 512, &amount, AVALON_READ_TIMEOUT);
 		if (err) {
 			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
