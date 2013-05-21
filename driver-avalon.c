@@ -957,9 +957,10 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	while (true) {
 		bool decoded;
 
-		ret = avalon_get_result(avalon, &ar, &max_ms);
-		if (unlikely(ret == AVA_BUFFER_EMPTY))
+		if (unlikely(!avalon_buffer_full(avalon)))
 			break;
+		
+		ret = avalon_get_result(avalon, &ar, &max_ms);
 
 		cgtime(&tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
