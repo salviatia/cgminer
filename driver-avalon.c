@@ -267,7 +267,7 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 	abstime.tv_nsec = then.tv_usec * 1000;
 
 	mutex_lock(&info->read_mutex);
-	if (info->offset < AVALON_READ_SIZE || !info->aligned) {
+	if (info->offset < AVALON_READ_SIZE) {
 		ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
 		if (ret) {
 			ret = AVA_GETS_TIMEOUT;
@@ -710,56 +710,6 @@ static void avalon_reinit(struct cgpu_info *avalon)
 	avalon_reset(avalon);
 }
 
-static bool __aligned_readbuf(struct avalon_info *info)
-{
-	uint8_t miner_num = info->miner_count;
-
-	if (info->aligned)
-		return true;
-
-	if (!memcmp(&info->readbuf[AVALON_READ_SIZE - 1], &miner_num, 1)) {
-		info->aligned = true;
-		return true;
-	}
-
-	if (opt_debug) {
-		applog(LOG_DEBUG, "Avalon: Misaligned buffer:");
-		hexdump((uint8_t *)info->readbuf, AVALON_READ_SIZE);
-	}
-
-	while (info->offset > AVALON_READ_SIZE) {
-		size_t offset, tmp_offset = 0;
-		char *mn;
-
-		while (42) {
-			mn = memchr(&info->readbuf[tmp_offset], miner_num, info->offset);
-			if (!mn)
-				return false;
-			offset = mn - info->readbuf;
-			if (offset + AVALON_READ_SIZE > info->offset)
-				return false;
-			if (!memcmp(&info->readbuf[offset + AVALON_READ_SIZE], &miner_num, 1))
-				break;
-			tmp_offset = offset + 1;
-			if (tmp_offset >= info->offset)
-				return false;
-		}
-		if (offset == AVALON_READ_SIZE - 1) {
-			info->aligned = true;
-			if (opt_debug) {
-				applog(LOG_DEBUG, "Avalon: Realigned buffer:");
-				hexdump((uint8_t *)info->readbuf, AVALON_READ_SIZE);
-			}
-			return true;
-		}
-		if (info->offset <= offset)
-			return false;
-		info->offset -= offset;
-		memmove(info->readbuf, &info->readbuf[offset + 1], info->offset);
-	}
-	return false;
-}
-
 static void *avalon_get_results(void *userdata)
 {
 	struct cgpu_info *avalon = (struct cgpu_info *)userdata;
@@ -770,7 +720,6 @@ static void *avalon_get_results(void *userdata)
 	 * releses it */
 	mutex_lock(&info->read_mutex);
 	info->offset = 0;
-	info->aligned = false;
 	mutex_unlock(&info->read_mutex);
 
 	while (42) {
@@ -794,7 +743,7 @@ static void *avalon_get_results(void *userdata)
 			memcpy(&info->readbuf[info->offset], &buf[2], amount);
 			info->offset += amount;
 		}
-		if (info->offset >= AVALON_READ_SIZE && __aligned_readbuf(info))
+		if (info->offset >= AVALON_READ_SIZE)
 			pthread_cond_broadcast(&info->read_cond);
 		mutex_unlock(&info->read_mutex);
 		if (!amount)
