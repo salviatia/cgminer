@@ -735,6 +735,9 @@ static bool __aligned_readbuf(struct avalon_info *info)
 				return false;
 			if (!memcmp(&info->readbuf[offset + AVALON_READ_SIZE], &miner_num, 1))
 				break;
+			tmp_offset = offset + 1;
+			if (tmp_offset >= info->offset)
+				return false;
 		}
 		if (offset == AVALON_READ_SIZE - 1) {
 			info->aligned = true;
