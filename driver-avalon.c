@@ -122,11 +122,19 @@ static inline void avalon_create_task(struct avalon_task *at,
 	memcpy(at->data, work->data + 64, 12);
 }
 
-/* Wait till the  buffer can accept more writes */
+/* Wait till the buffer can accept more writes. The usb status is updated every
+ * 40ms. */
 static void avalon_wait_ready(struct cgpu_info *avalon)
 {
 	while (avalon_buffer_full(avalon))
-		nmsleep(100);
+		nmsleep(50);
+}
+
+/* Wait till there are no errors signaling we can read */
+static void avalon_wait_clear(struct cgpu_info *avalon)
+{
+	while (usb_ftdi_err(avalon))
+		nmsleep(50);
 }
 
 static int avalon_send_task(const struct avalon_task *at,
@@ -223,6 +231,7 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 		}
 
 		cgtime(&tv_before);
+		avalon_wait_clear(avalon);
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
 					    timeout, C_GET_AR);
 		cgtime(&tv_after);
@@ -299,6 +308,7 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	memset(result, 0, AVALON_READ_SIZE);
 	memset(ar, 0, AVALON_READ_SIZE);
 
+	avalon_wait_clear(avalon);
 	err = usb_ftdi_read_timeout(avalon, result, AVALON_READ_SIZE, &amount,
 				    1000, C_GET_AR);
 	if (err < 0 || amount != AVALON_READ_SIZE) {
@@ -667,6 +677,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 	if (avalon->usbinfo.nodev)
 		return;
 
+	avalon_wait_clear(avalon);
 	err = usb_ftdi_read_timeout(avalon, &buf, 1, &amount, 100, C_GET_AVALON_READY);
 
 	applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
