@@ -300,8 +300,7 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	memset(result, 0, AVALON_READ_SIZE);
 	memset(ar, 0, AVALON_READ_SIZE);
 
-	err = usb_ftdi_read_timeout(avalon, result, AVALON_READ_SIZE, &amount,
-				    1000, C_GET_AR);
+	err = usb_ftdi_read(avalon, result, AVALON_READ_SIZE, &amount, C_GET_AR);
 	if (err < 0 || amount != AVALON_READ_SIZE) {
 		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", err);
 		applog(LOG_WARNING, "Avalon: USB read asked for %lu, got %d",
@@ -318,6 +317,20 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 		hexdump((uint8_t *)result, AVALON_READ_SIZE);
 	}
 	memcpy(ar, result, AVALON_READ_SIZE);
+}
+
+static void avalon_clear_readbuf(struct cgpu_info *avalon)
+{
+	char buf[512];
+	int amount, err;
+
+	do {
+		err = usb_read_timeout(avalon, buf, 512, &amount, 1,
+				       C_GET_AVALON_READY);
+
+		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
+		       avalon->drv->name, avalon->device_id, err);
+	} while (amount > 2);
 }
 
 static int avalon_reset(struct cgpu_info *avalon)
@@ -352,13 +365,14 @@ static int avalon_reset(struct cgpu_info *avalon)
 		applog(LOG_ERR, "Avalon: Reset failed! not an Avalon?"
 		       " (%d: %02x %02x %02x %02x)",
 		       i, buf[0], buf[1], buf[2], buf[3]);
-		/* FIXME: return 1; */
+		return 1;
 	} else {
 		applog(LOG_WARNING, "Avalon: Reset succeeded");
 		/* If the reset went according to plan, we can read off the
 		 * actual miner_num. */
 		avalon_infos[avalon->device_id]->miner_count = ar.miner_num;
 	}
+	avalon_clear_readbuf(avalon);
 	return 0;
 }
 
@@ -523,20 +537,6 @@ static void get_options(int this_option_offset, int *baud, int *miner_count,
 	}
 }
 
-static void avalon_clear_results(struct cgpu_info *avalon)
-{
-	char buf[512];
-	int amount, err;
-
-	do {
-		err = usb_ftdi_read_timeout(avalon, buf, 510, &amount, 1,
-					    C_GET_AVALON_READY);
-
-		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
-		       avalon->drv->name, avalon->device_id, err);
-	} while (amount > 0);
-}
-
 static void avalon_initialise(struct cgpu_info *avalon)
 {
 	int err, interface;
@@ -596,7 +596,7 @@ static void avalon_initialise(struct cgpu_info *avalon)
 	if (avalon->usbinfo.nodev)
 		return;
 
-	avalon_clear_results(avalon);
+	avalon_clear_readbuf(avalon);
 }
 
 static bool avalon_detect_one(libusb_device *dev, struct usb_find_devices *found)
