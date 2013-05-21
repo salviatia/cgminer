@@ -525,16 +525,16 @@ static void get_options(int this_option_offset, int *baud, int *miner_count,
 
 static void avalon_clear_results(struct cgpu_info *avalon)
 {
-	char buf[AVALON_READ_SIZE];
+	char buf[512];
 	int amount, err;
 
 	do {
-		err = usb_ftdi_read_timeout(avalon, buf, AVALON_READ_SIZE,
-					    &amount, 50, C_GET_AVALON_READY);
+		err = usb_ftdi_read_timeout(avalon, buf, 512, &amount, 1,
+					    C_GET_AVALON_READY);
 
 		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
 		       avalon->drv->name, avalon->device_id, err);
-	} while (amount == AVALON_READ_SIZE);
+	} while (amount > 0);
 }
 
 static void avalon_initialise(struct cgpu_info *avalon)
