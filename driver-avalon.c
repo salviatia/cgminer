@@ -890,7 +890,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 		applog(LOG_DEBUG, "AVA%i: One set of submits without full buffer",
 		       avalon->device_id);
 		avalon_rotate_array(avalon);
-		return 0xffffffff;
+		return 0;
 	}
 
 	elapsed.tv_sec = elapsed.tv_usec = 0;
