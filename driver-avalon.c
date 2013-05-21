@@ -122,11 +122,12 @@ static inline void avalon_create_task(struct avalon_task *at,
 	memcpy(at->data, work->data + 64, 12);
 }
 
-/* Wait till the  buffer can accept more writes */
+/* Wait till the  buffer can accept more writes. The usb status is updated
+ * every 40ms. */
 static void avalon_wait_ready(struct cgpu_info *avalon)
 {
 	while (avalon_buffer_full(avalon))
-		nmsleep(100);
+		nmsleep(50);
 }
 
 static int avalon_send_task(const struct avalon_task *at,
