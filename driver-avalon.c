@@ -32,6 +32,7 @@
   #include <windows.h>
   #include <io.h>
 #endif
+#include <pthread.h>
 
 #include "elist.h"
 #include "miner.h"
@@ -253,21 +254,40 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 }
 
 static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
-			     struct thr_info *thr, int *max_timeout)
+			     int *max_timeout)
 {
-	uint8_t result[AVALON_READ_SIZE];
+	struct avalon_info *info = avalon_infos[avalon->device_id];;
+	struct timeval now, then, tdiff;
+	struct timespec abstime;
 	int ret;
 
-	memset(result, 0, AVALON_READ_SIZE);
-	ret = avalon_gets(avalon, result, thr, max_timeout);
+	cgtime(&now);
+	tdiff.tv_sec = *max_timeout / 1000;
+	tdiff.tv_usec = *max_timeout * 1000 - (tdiff.tv_sec * 1000000);
+	timeradd(&now, &tdiff, &then);
+	abstime.tv_sec = then.tv_sec;
+	abstime.tv_nsec = then.tv_usec * 1000;
 
-	if (ret == AVA_GETS_OK) {
-		if (opt_debug) {
-			applog(LOG_DEBUG, "Avalon: get:");
-			hexdump((uint8_t *)result, AVALON_READ_SIZE);
-		}
-		memcpy((uint8_t *)ar, result, AVALON_READ_SIZE);
+	mutex_lock(&info->read_mutex);
+	ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
+	if (ret) {
+		ret = AVA_GETS_TIMEOUT;
+		goto out_unlock;
 	}
+	memcpy(ar, info->readbuf, AVALON_READ_SIZE);
+	info->offset -= AVALON_READ_SIZE;
+	memmove(info->readbuf, &info->readbuf[AVALON_READ_SIZE], info->offset);
+	if (opt_debug) {
+		applog(LOG_DEBUG, "Avalon: get:");
+		hexdump((uint8_t *)ar, AVALON_READ_SIZE);
+	}
+	ret = AVA_GETS_OK;
+out_unlock:
+	mutex_unlock(&info->read_mutex);
+
+	cgtime(&then);
+	timersub(&then, &now, &tdiff);
+	*max_timeout -= (tdiff.tv_sec * 1000) + (tdiff.tv_usec / 1000);
 
 	return ret;
 }
@@ -379,7 +399,6 @@ static int avalon_reset(struct cgpu_info *avalon)
 		 * actual miner_num. */
 		avalon_infos[avalon->device_id]->miner_count = ar.miner_num;
 	}
-	avalon_clear_readbuf(avalon);
 	return 0;
 }
 
@@ -401,10 +420,6 @@ static void avalon_idle(struct cgpu_info *avalon)
 		}
 	}
 	applog(LOG_WARNING, "Avalon: Goto idle mode");
-	avalon_clear_readbuf(avalon);
-	/* No chips should be returning responses after 2 seconds */
-	sleep(2);
-	avalon_clear_readbuf(avalon);
 }
 
 static void get_options(int this_option_offset, int *baud, int *miner_count,
@@ -698,6 +713,44 @@ static void avalon_reinit(struct cgpu_info *avalon)
 	avalon_idle(avalon);
 }
 
+static void *avalon_get_results(void *userdata)
+{
+	struct cgpu_info *avalon = (struct cgpu_info *)userdata;
+	struct avalon_info *info = avalon_infos[avalon->device_id];
+	const int rsize = 512;
+
+	info->offset = 0;
+
+	while (42) {
+		int amount, err;
+		char buf[rsize];
+
+		if (unlikely(info->offset + rsize >= AVALON_READBUF_SIZE)) {
+			applog(LOG_ERR, "Avalon readbuf overflow, resetting buffer");
+			mutex_lock(&info->read_mutex);
+			info->offset = 0;
+			mutex_unlock(&info->read_mutex);
+		}
+
+		err = usb_read_once(avalon, buf, 512, &amount, C_AVALON_READ);
+		applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
+		       avalon->drv->name, avalon->device_id, err);
+		amount -= 2;
+		if (amount < 1) {
+			nmsleep(8);
+			continue;
+		}
+
+		mutex_lock(&info->read_mutex);
+		memcpy(&info->readbuf[info->offset], &buf[2], amount);
+		info->offset += amount;
+		if (info->offset >= AVALON_READ_SIZE)
+			pthread_cond_broadcast(&info->read_cond);
+		mutex_unlock(&info->read_mutex);
+	}
+	return NULL;
+}
+
 static bool avalon_prepare(struct thr_info *thr)
 {
 	struct cgpu_info *avalon = thr->cgpu;
@@ -709,6 +762,14 @@ static bool avalon_prepare(struct thr_info *thr)
 			       AVALON_ARRAY_SIZE);
 	if (!avalon->works)
 		quit(1, "Failed to calloc avalon works in avalon_prepare");
+
+	mutex_init(&info->read_mutex);
+	if (unlikely(pthread_cond_init(&info->read_cond, NULL)))
+		quit(1, "Failed to pthread_cond_init avalon read_cond");
+	avalon_clear_readbuf(avalon);
+
+	if (pthread_create(&info->read_thr, NULL, avalon_get_results, (void *)avalon))
+		quit(1, "Failed to create avalon read_thr");
 
 	avalon_init(avalon);
 
@@ -900,7 +961,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	while (true) {
 		bool decoded;
 
-		ret = avalon_get_result(avalon, &ar, thr, &max_ms);
+		ret = avalon_get_result(avalon, &ar, &max_ms);
 		if (unlikely(ret == AVA_BUFFER_EMPTY))
 			break;
 

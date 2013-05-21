@@ -28,6 +28,8 @@
 #define AVALON_DEFAULT_MINER_NUM 0x20
 #define AVALON_DEFAULT_ASIC_NUM 0xA
 
+#define AVALON_READBUF_SIZE 8192
+
 struct avalon_task {
 	uint8_t reset		:1;
 	uint8_t flush_fifo	:1;
@@ -95,6 +97,12 @@ struct avalon_info {
 	int matching_work[AVALON_DEFAULT_MINER_NUM];
 
 	int frequency;
+
+	pthread_t read_thr;
+	pthread_mutex_t read_mutex;
+	pthread_cond_t read_cond;
+	char readbuf[AVALON_READBUF_SIZE];
+	size_t offset;
 };
 
 #define AVALON_WRITE_SIZE (sizeof(struct avalon_task))
