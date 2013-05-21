@@ -300,6 +300,11 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 	}
 
 	if (!found) {
+		if (opt_debug) {
+			applog(LOG_DEBUG, "Avalon: No Valid:");
+			hexdump((uint8_t *)info->readbuf, copied);
+		}
+
 		/* Only offset if we have tried 2 full AR's worth */
 		if (copied == DOUBLE_AR) {
 			applog(LOG_DEBUG, "Avalon: No valid work found");
