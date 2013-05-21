@@ -279,7 +279,7 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 	memset(ar, 0, sizeof(struct avalon_result));
 
 	mutex_lock(&info->read_mutex);
-	if (info->offset < AVALON_READ_SIZE) {
+	if (info->offset < AVALON_READ_SIZE || !info->aligned) {
 		ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
 		if (ret) {
 			ret = AVA_GETS_TIMEOUT;
@@ -306,9 +306,11 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			info->offset -= AVALON_READ_SIZE;
 			memmove(info->readbuf, &info->readbuf[AVALON_READ_SIZE], info->offset);
 		}
+		info->aligned = false;
 		goto out_unlock;
 	}
 
+	info->aligned = true;
 	copied = AVALON_READ_SIZE + offset;
 	memcpy(ar, &info->readbuf[offset], AVALON_READ_SIZE);
 	info->offset -= copied;
@@ -773,17 +775,17 @@ static void *avalon_get_results(void *userdata)
 		applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
 		       avalon->drv->name, avalon->device_id, err);
 		amount -= 2;
+		if (amount < 1) {
+			nmsleep(8);
+			continue;
+		}
 
 		mutex_lock(&info->read_mutex);
-		if (amount > 0) {
-			memcpy(&info->readbuf[info->offset], &buf[2], amount);
-			info->offset += amount;
-		}
+		memcpy(&info->readbuf[info->offset], &buf[2], amount);
+		info->offset += amount;
 		if (info->offset >= AVALON_READ_SIZE)
 			pthread_cond_broadcast(&info->read_cond);
 		mutex_unlock(&info->read_mutex);
-		if (!amount)
-			nmsleep(8);
 	}
 	return NULL;
 }

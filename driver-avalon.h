@@ -103,6 +103,7 @@ struct avalon_info {
 	pthread_cond_t read_cond;
 	char readbuf[AVALON_READBUF_SIZE];
 	size_t offset;
+	bool aligned;
 };
 
 #define AVALON_WRITE_SIZE (sizeof(struct avalon_task))
