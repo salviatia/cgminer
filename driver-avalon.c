@@ -123,6 +123,11 @@ static inline void avalon_create_task(struct avalon_task *at,
 	memcpy(at->data, work->data + 64, 12);
 }
 
+static bool avalon_buffer_full(struct cgpu_info *avalon)
+{
+	return avalon_infos[avalon->device_id]->buffer_full;
+}
+
 /* Wait till the  buffer can accept more writes. The usb status is updated
  * every 40ms. */
 static void avalon_wait_ready(struct cgpu_info *avalon)
@@ -757,6 +762,8 @@ static void avalon_reinit(struct cgpu_info *avalon)
 	avalon_reset(avalon);
 }
 
+#define FTDI_RS0_CTS    (1 << 4)
+
 static void *avalon_get_results(void *userdata)
 {
 	struct cgpu_info *avalon = (struct cgpu_info *)userdata;
@@ -785,6 +792,8 @@ static void *avalon_get_results(void *userdata)
 			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
 			       avalon->drv->name, avalon->device_id, err);
 		}
+
+		info->buffer_full = !!(buf[0] & FTDI_RS0_CTS);
 		amount -= 2;
 		if (amount < 1) {
 			nmsleep(8);
