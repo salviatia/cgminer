@@ -181,6 +181,9 @@ void usb_initialise();
 #define usb_read_ep(cgpu, ep, buf, bufsiz, read, cmd) \
 	_usb_read(cgpu, ep, buf, bufsiz, read, DEVTIMEOUT, NULL, cmd, false, false)
 
+#define usb_read_once_timeout(cgpu, buf, bufsiz, read, timeout, cmd) \
+	_usb_read(cgpu, DEFAULT_EP_IN, buf, bufsiz, read, timeout, NULL, cmd, false, true)
+
 #define usb_read_timeout(cgpu, buf, bufsiz, read, timeout, cmd) \
 	_usb_read(cgpu, DEFAULT_EP_IN, buf, bufsiz, read, timeout, NULL, cmd, false, false)
 
