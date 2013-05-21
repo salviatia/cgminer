@@ -224,12 +224,10 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 			return AVA_GETS_RESTART;
 		}
 
-		clear_ftdi_status(avalon);
 		cgtime(&tv_before);
 		err = usb_ftdi_read_timeout(avalon, buf, read_amount, &ret,
 					    timeout, C_GET_AR);
 		cgtime(&tv_after);
-		clear_ftdi_status(avalon);
 		timersub(&tv_after, &tv_before, &tv_diff);
 		*max_timeout -= tv_diff.tv_sec * 1000;
 		*max_timeout -= tv_diff.tv_usec / 1000;
@@ -306,10 +304,8 @@ static void avalon_get_reset(struct cgpu_info *avalon, struct avalon_result *ar)
 	memset(result, 0, AVALON_READ_SIZE);
 	memset(ar, 0, AVALON_READ_SIZE);
 
-	clear_ftdi_status(avalon);
 	err = usb_ftdi_read_timeout(avalon, result, AVALON_READ_SIZE, &amount,
 				    2000, C_GET_AR);
-	clear_ftdi_status(avalon);
 	if (err < 0 || amount != AVALON_READ_SIZE) {
 		applog(LOG_WARNING, "Avalon: Error %d on read in avalon_get_reset", err);
 		applog(LOG_WARNING, "Avalon: USB read asked for %lu, got %d",
@@ -334,10 +330,8 @@ static void avalon_clear_readbuf(struct cgpu_info *avalon)
 	char buf[512];
 
 	do {
-		clear_ftdi_status(avalon);
 		err = usb_read_once_timeout(avalon, buf, 512, &amount, 50,
 					    C_GET_AVALON_READY);
-		clear_ftdi_status(avalon);
 
 		applog(LOG_DEBUG, "%s%i: Get avalon ready got err %d",
 		       avalon->drv->name, avalon->device_id, err);
