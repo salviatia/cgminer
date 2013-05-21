@@ -793,7 +793,7 @@ static void *avalon_get_results(void *userdata)
 		memcpy(&info->readbuf[info->offset], &buf[2], amount);
 		info->offset += amount;
 		if (info->offset >= AVALON_READ_SIZE)
-			pthread_cond_broadcast(&info->read_cond);
+			pthread_cond_signal(&info->read_cond);
 		mutex_unlock(&info->read_mutex);
 	}
 	return NULL;
