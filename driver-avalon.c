@@ -213,7 +213,7 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 {
 	struct timeval tv_before, tv_after, tv_diff;
 	int read_amount = AVALON_READ_SIZE;
-	const unsigned int timeout = 100;
+	const unsigned int timeout = 50;
 	int ret, err;
 
 	while (true) {
@@ -230,11 +230,14 @@ avalon_gets(struct cgpu_info *avalon, void *buf, struct thr_info *thr,
 		*max_timeout -= tv_diff.tv_sec * 1000;
 		*max_timeout -= tv_diff.tv_usec / 1000;
 
-		if (*max_timeout <= 0) {
-			err = 0;
-			if (!ret && read_amount == AVALON_READ_SIZE)
+		if (!ret && read_amount == AVALON_READ_SIZE) {
+			/* No data read yet. */
+			if (*max_timeout <= 0)
 				return AVA_GETS_TIMEOUT;
+			if (!avalon_buffer_full(avalon))
+				return AVA_BUFFER_EMPTY;
 		}
+
 		if (err && err != LIBUSB_ERROR_TIMEOUT) {
 			applog(LOG_ERR, "Avalon: Error %d on usb read in avalon_gets", err);
 			return AVA_GETS_ERROR;
@@ -881,10 +884,10 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	while (true) {
 		bool decoded;
 
-		if (!avalon_buffer_full(avalon))
+		ret = avalon_get_result(avalon, &ar, thr, &max_ms);
+		if (unlikely(ret == AVA_BUFFER_EMPTY))
 			break;
 
-		ret = avalon_get_result(avalon, &ar, thr, &max_ms);
 		cgtime(&tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
 			applog(LOG_ERR,
