@@ -104,6 +104,7 @@ struct avalon_info {
 	pthread_cond_t read_cond;
 	char readbuf[AVALON_READBUF_SIZE];
 	size_t offset;
+	bool aligned;
 
 	bool buffer_full;
 };
