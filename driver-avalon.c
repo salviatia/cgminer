@@ -197,8 +197,10 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
+	mutex_lock(&info->read_mutex);
 	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
 			C_AVALON_TASK);
+	mutex_unlock(&info->read_mutex);
 
 	applog(LOG_DEBUG, "%s%i: usb_write got err %d",
 	       avalon->drv->name, avalon->device_id, err);
