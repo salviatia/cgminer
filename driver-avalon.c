@@ -132,8 +132,8 @@ static bool avalon_buffer_full(struct cgpu_info *avalon)
  * every 40ms. */
 static void avalon_wait_ready(struct cgpu_info *avalon)
 {
-	while (avalon_buffer_full(avalon))
-		nmsleep(50);
+	while (avalon_buffer_full(avalon) || usb_ftdi_err(avalon))
+		nmsleep(40);
 }
 
 static int avalon_send_task(const struct avalon_task *at,
