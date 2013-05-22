@@ -756,7 +756,7 @@ static void *avalon_get_results(void *userdata)
 		/* The first 2 bytes of every 64 is the status */
 		mutex_lock(&info->read_mutex);
 		do {
-			cp = amount - offset;
+			cp = amount - 2;
 			if (cp > 62)
 				cp = 62;
 			memcpy(&info->readbuf[info->offset], &buf[offset], cp);
