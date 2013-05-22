@@ -402,8 +402,11 @@ static int avalon_reset(struct cgpu_info *avalon)
 	} else {
 		applog(LOG_WARNING, "Avalon: Reset succeeded");
 		/* If the reset went according to plan, we can read off the
-		 * actual miner_num. */
+		 * actual miner_num and timeout. */
+		avalon_infos[avalon->device_id]->timeout = ar.timeout;
 		avalon_infos[avalon->device_id]->miner_count = ar.miner_num;
+		applog(LOG_DEBUG, "Avalon: Result read off timeout %u  miner_count %u",
+		       ar.timeout, ar.miner_num);
 	}
 	return 0;
 }
