@@ -246,6 +246,10 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 				ret = AVA_GETS_TIMEOUT;
 				goto out_unlock;
 			}
+			if (!avalon_buffer_full(avalon)) {
+				ret = AVA_GETS_BUF_EMPTY;
+				goto out_unlock;
+			}
 		} while (info->offset < AVALON_READ_SIZE);
 	}
 
@@ -712,6 +716,12 @@ static void avalon_reinit(struct cgpu_info *avalon)
 
 #define FTDI_RS0_CTS    (1 << 4)
 
+/* Set out of lock but it's a simple bool */
+static void set_avalon_cts(struct avalon_info *info, char *buf)
+{
+	info->buffer_full = !(buf[0] & FTDI_RS0_CTS);
+}
+
 static void *avalon_get_results(void *userdata)
 {
 	struct cgpu_info *avalon = (struct cgpu_info *)userdata;
@@ -744,9 +754,10 @@ static void *avalon_get_results(void *userdata)
 			continue;
 		}
 
-		/* Set out of lock but it's a simple bool */
-		info->buffer_full = !(buf[0] & FTDI_RS0_CTS);
 		if (amount < 3) {
+			set_avalon_cts(info, buf);
+			if (!info->buffer_full)
+				pthread_cond_signal(&info->read_cond);
 			nmsleep(AVALON_READ_TIMEOUT);
 			continue;
 		}
@@ -756,6 +767,7 @@ static void *avalon_get_results(void *userdata)
 		/* The first 2 bytes of every 64 is the status */
 		mutex_lock(&info->read_mutex);
 		do {
+			set_avalon_cts(info, &buf[offset - 2]);
 			cp = amount - 2;
 			if (cp > 62)
 				cp = 62;
@@ -982,10 +994,12 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	while (true) {
 		bool decoded;
 
-		if (unlikely(!avalon_buffer_full(avalon)))
+		if (!avalon_buffer_full(avalon))
 			break;
-		
+
 		ret = avalon_get_result(avalon, &ar, &max_ms);
+		if (ret == AVA_GETS_BUF_EMPTY)
+			break;
 
 		cgtime(&tv_finish);
 		if (unlikely(ret == AVA_GETS_ERROR)) {
