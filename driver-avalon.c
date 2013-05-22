@@ -128,11 +128,22 @@ static bool avalon_buffer_full(struct cgpu_info *avalon)
 	return avalon_infos[avalon->device_id]->buffer_full;
 }
 
+static bool avalon_write_ready(struct cgpu_info *avalon)
+{
+	return usb_ftdi_ctw(avalon);
+}
+
 /* Wait till the  buffer can accept more writes. The usb status is updated
  * every 40ms. */
 static void avalon_wait_ready(struct cgpu_info *avalon)
 {
-	while (avalon_buffer_full(avalon) || !usb_ftdi_ctw(avalon))
+	while (avalon_buffer_full(avalon) || !avalon_write_ready(avalon))
+		nmsleep(40);
+}
+
+static void avalon_wait_write(struct cgpu_info *avalon)
+{
+	while (!avalon_write_ready(avalon))
 		nmsleep(40);
 }
 
@@ -197,6 +208,7 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
+	avalon_wait_write(avalon);
 	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
 			C_AVALON_TASK);
 
