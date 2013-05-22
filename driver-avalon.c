@@ -978,7 +978,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 
 	struct timeval tv_start, tv_finish, elapsed;
 	uint32_t nonce;
-	int64_t hash_count;
+	int64_t hash_count = 0;
 	int result_wrong, max_ms;
 	bool full = avalon_buffer_full(avalon);
 
@@ -1009,7 +1009,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			sleep(1);
 			avalon_init(avalon);
 #endif
-			return 0;	/* This should never happen */
+			goto out;	/* This should never happen */
 		}
 
 		works[i]->blk.nonce = 0xffffffff;
@@ -1019,8 +1019,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	if (!full) {
 		applog(LOG_DEBUG, "AVA%i: One set of submits without full buffer",
 		       avalon->device_id);
-		avalon_rotate_array(avalon);
-		return 0;
+		goto out;
 	}
 
 	elapsed.tv_sec = elapsed.tv_usec = 0;
@@ -1043,7 +1042,7 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			applog(LOG_ERR,
 			       "AVA%i: Comms error(read)", avalon->device_id);
 			//dev_error(avalon, REASON_DEV_COMMS_ERROR);
-			return 0;
+			goto out;
 		}
 
 		decoded = avalon_decode_nonce(thr, &ar, &nonce);
@@ -1105,8 +1104,6 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 #endif
 	}
 
-	avalon_rotate_array(avalon);
-
 	if (hash_count) {
 		record_temp_fan(info, &ar, &(avalon->temp));
 		applog(LOG_INFO,
@@ -1124,6 +1121,8 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 			info->temp_sum = 0;
 		}
 	}
+out:
+	avalon_rotate_array(avalon);
 
 	/* This hashmeter is just a utility counter based on returned shares */
 	return hash_count;
