@@ -725,7 +725,7 @@ static void *avalon_get_results(void *userdata)
 	mutex_unlock(&info->read_mutex);
 
 	while (42) {
-		int amount, err;
+		int amount, err, offset, cp;
 		char buf[rsize];
 
 		if (unlikely(info->offset + rsize >= AVALON_READBUF_SIZE)) {
@@ -746,15 +746,24 @@ static void *avalon_get_results(void *userdata)
 
 		/* Set out of lock but it's a simple bool */
 		info->buffer_full = !(buf[0] & FTDI_RS0_CTS);
-		amount -= 2;
-		if (amount < 1) {
+		if (amount < 3) {
 			nmsleep(AVALON_READ_TIMEOUT);
 			continue;
 		}
 
+		offset = 2;
+
+		/* The first 2 bytes of every 64 is the status */
 		mutex_lock(&info->read_mutex);
-		memcpy(&info->readbuf[info->offset], &buf[2], amount);
-		info->offset += amount;
+		do {
+			cp = amount - offset;
+			if (cp > 62)
+				cp = 62;
+			memcpy(&info->readbuf[info->offset], &buf[offset], cp);
+			info->offset += cp;
+			amount -= cp;
+			offset += 64;
+		} while (amount > 2);
 		if (info->offset >= AVALON_READ_SIZE)
 			pthread_cond_signal(&info->read_cond);
 		mutex_unlock(&info->read_mutex);
