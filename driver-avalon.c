@@ -728,15 +728,15 @@ static void *avalon_get_results(void *userdata)
 		int amount, err;
 		char buf[rsize];
 
+		mutex_lock(&info->read_mutex);
 		if (unlikely(info->offset + rsize >= AVALON_READBUF_SIZE)) {
 			applog(LOG_ERR, "Avalon readbuf overflow, resetting buffer");
-			mutex_lock(&info->read_mutex);
 			info->offset = 0;
-			mutex_unlock(&info->read_mutex);
 		}
-
 		err = usb_read_once_timeout(avalon, buf, rsize, &amount,
 					    AVALON_READ_TIMEOUT, C_AVALON_READ);
+		mutex_unlock(&info->read_mutex);
+
 		if (err) {
 			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
 			       avalon->drv->name, avalon->device_id, err);
