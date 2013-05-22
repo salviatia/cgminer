@@ -268,9 +268,10 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			applog(LOG_DEBUG, "Avalon: No Valid Results in:");
 			hexdump((uint8_t *)info->readbuf, copied);
 		}
+		spare += 1;
 		applog(LOG_WARNING, "Avalon: No results discarded %u bytes from read buffer",
 			(unsigned int)spare);
-		memmove(info->readbuf, &info->readbuf[spare + 1],
+		memmove(info->readbuf, &info->readbuf[spare],
 			AVALON_READ_SIZE - 1);
 		info->offset = AVALON_READ_SIZE - 1;
 		goto out_unlock;
