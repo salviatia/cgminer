@@ -761,7 +761,7 @@ static void *avalon_get_results(void *userdata)
 				cp = 62;
 			memcpy(&info->readbuf[info->offset], &buf[offset], cp);
 			info->offset += cp;
-			amount -= cp;
+			amount -= cp + 2;
 			offset += 64;
 		} while (amount > 2);
 		if (info->offset >= AVALON_READ_SIZE)
