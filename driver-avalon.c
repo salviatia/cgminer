@@ -712,7 +712,6 @@ static void avalon_init(struct cgpu_info *avalon)
 	applog(LOG_INFO, "Avalon: Opened on %s", avalon->device_path);
 	avalon_clear_readbuf(avalon);
 	avalon_idle(avalon);
-	avalon_clear_readbuf(avalon);
 }
 
 static void avalon_reinit(struct cgpu_info *avalon)
@@ -795,6 +794,7 @@ static bool avalon_prepare(struct thr_info *thr)
 	struct cgpu_info *avalon = thr->cgpu;
 	struct avalon_info *info = avalon_infos[avalon->device_id];
 	struct timeval now;
+	int i;
 
 	free(avalon->works);
 	avalon->works = calloc(info->miner_count * sizeof(struct work *),
@@ -812,6 +812,23 @@ static bool avalon_prepare(struct thr_info *thr)
 
 	avalon_init(avalon);
 	mutex_unlock(&info->read_mutex);
+
+	/* Discard the responses for the idle work items given */
+	for (i = 0; i < info->miner_count; i++) {
+		while (42) {
+			/* Discard one avalon result */
+			mutex_lock(&info->read_mutex);
+			if (info->offset >= AVALON_READ_SIZE) {
+				memmove(info->readbuf, &info->readbuf[AVALON_READ_SIZE],
+					AVALON_READ_SIZE);
+				info->offset -= AVALON_READ_SIZE;
+				mutex_unlock(&info->read_mutex);
+				break;
+			}
+			pthread_cond_wait(&info->read_cond, &info->read_mutex);
+			mutex_unlock(&info->read_mutex);
+		}
+	}
 
 	cgtime(&now);
 	get_datestamp(avalon->init, &now);
