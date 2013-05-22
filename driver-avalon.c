@@ -735,7 +735,7 @@ static void *avalon_get_results(void *userdata)
 			mutex_unlock(&info->read_mutex);
 		}
 
-		err = usb_read_once_timeout(avalon, buf, 512, &amount,
+		err = usb_read_once_timeout(avalon, buf, rsize, &amount,
 					    AVALON_READ_TIMEOUT, C_AVALON_READ);
 		if (err) {
 			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
