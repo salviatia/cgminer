@@ -197,10 +197,8 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
-	mutex_lock(&info->read_mutex);
 	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
 			C_AVALON_TASK);
-	mutex_unlock(&info->read_mutex);
 
 	applog(LOG_DEBUG, "%s%i: usb_write got err %d",
 	       avalon->drv->name, avalon->device_id, err);
@@ -720,19 +718,25 @@ static void *avalon_get_results(void *userdata)
 	struct avalon_info *info = avalon_infos[avalon->device_id];
 	const int rsize = 512;
 
+	/* This lock prevents the reads from starting till avalon_prepare
+	 * releses it */
+	mutex_lock(&info->read_mutex);
+	info->offset = 0;
+	mutex_unlock(&info->read_mutex);
+
 	while (42) {
 		int amount, err;
 		char buf[rsize];
 
-		mutex_lock(&info->read_mutex);
 		if (unlikely(info->offset + rsize >= AVALON_READBUF_SIZE)) {
 			applog(LOG_ERR, "Avalon readbuf overflow, resetting buffer");
+			mutex_lock(&info->read_mutex);
 			info->offset = 0;
+			mutex_unlock(&info->read_mutex);
 		}
+
 		err = usb_read_once_timeout(avalon, buf, rsize, &amount,
 					    AVALON_READ_TIMEOUT, C_AVALON_READ);
-		mutex_unlock(&info->read_mutex);
-
 		if (err) {
 			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
 			       avalon->drv->name, avalon->device_id, err);
@@ -771,6 +775,7 @@ static bool avalon_prepare(struct thr_info *thr)
 		quit(1, "Failed to calloc avalon works in avalon_prepare");
 
 	mutex_init(&info->read_mutex);
+	mutex_lock(&info->read_mutex);
 	if (unlikely(pthread_cond_init(&info->read_cond, NULL)))
 		quit(1, "Failed to pthread_cond_init avalon read_cond");
 
@@ -778,6 +783,7 @@ static bool avalon_prepare(struct thr_info *thr)
 		quit(1, "Failed to create avalon read_thr");
 
 	avalon_init(avalon);
+	mutex_unlock(&info->read_mutex);
 
 	cgtime(&now);
 	get_datestamp(avalon->init, &now);
