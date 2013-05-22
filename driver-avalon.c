@@ -768,9 +768,11 @@ static void *avalon_get_results(void *userdata)
 		}
 
 		if (amount < 3) {
-			set_avalon_cts(info, buf);
-			if (!info->buffer_full)
-				pthread_cond_signal(&info->read_cond);
+			if (amount == 2) {
+				set_avalon_cts(info, buf);
+				if (!info->buffer_full)
+					pthread_cond_signal(&info->read_cond);
+			}
 			nmsleep(AVALON_READ_TIMEOUT);
 			continue;
 		}
