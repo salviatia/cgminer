@@ -956,8 +956,9 @@ static int64_t avalon_scanhash(struct thr_info *thr)
 	works = avalon->works;
 	info = avalon_infos[avalon->device_id];
 	avalon_get_work_count = info->miner_count;
-	/* Do not try to read to the max nonce range or we may overshoot */
-	max_ms = 400000 / info->frequency;
+	/* A full nonce range, the longest we'd wait but the buffer will
+	 * return empty before then, signalling we should queue more work. */
+	max_ms = 424967 / info->frequency;
 
 	start_count = avalon->work_array * avalon_get_work_count;
 	end_count = start_count + avalon_get_work_count;
