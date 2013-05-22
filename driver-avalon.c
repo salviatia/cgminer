@@ -239,7 +239,7 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 	memset(ar, 0, sizeof(struct avalon_result));
 
 	mutex_lock(&info->read_mutex);
-	if (info->offset < AVALON_READ_SIZE || !info->aligned) {
+	if (info->offset < AVALON_READ_SIZE) {
 		do {
 			ret = pthread_cond_timedwait(&info->read_cond, &info->read_mutex, &abstime);
 			if (ret) {
@@ -268,7 +268,6 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 			applog(LOG_DEBUG, "Avalon: No Valid Results in:");
 			hexdump((uint8_t *)info->readbuf, copied);
 		}
-		info->aligned = false;
 		if (spare) {
 			applog(LOG_WARNING, "Avalon: No results discarded %u bytes from read buffer",
 			       (unsigned int)spare);
@@ -283,7 +282,6 @@ static int avalon_get_result(struct cgpu_info *avalon, struct avalon_result *ar,
 		applog(LOG_WARNING, "Avalon: Discarded %u bytes from read buffer",
 		       (unsigned int)offset);
 	}
-	info->aligned = true;
 	copied = AVALON_READ_SIZE + offset;
 	memcpy(ar, &info->readbuf[offset], AVALON_READ_SIZE);
 	info->offset -= copied;
