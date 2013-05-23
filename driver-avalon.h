@@ -104,8 +104,6 @@ struct avalon_info {
 	pthread_cond_t read_cond;
 	char readbuf[AVALON_READBUF_SIZE];
 	size_t offset;
-
-	bool buffer_full;
 };
 
 #define AVALON_WRITE_SIZE (sizeof(struct avalon_task))
@@ -129,6 +127,8 @@ struct avalon_info {
 #define avalon_open2(devpath, baud, purge)  serial_open(devpath, baud, AVALON_RESET_FAULT_DECISECONDS, purge)
 #define avalon_open(devpath, baud)  avalon_open2(devpath, baud, true)
 #define avalon_close(fd) close(fd)
+
+#define avalon_buffer_full(avalon) !usb_ftdi_cts(avalon)
 
 #define AVALON_READ_TIME(baud) ((double)AVALON_READ_SIZE * (double)8.0 / (double)(baud))
 #define ASSERT1(condition) __maybe_unused static char sizeof_uint32_t_must_be_4[(condition)?1:-1]

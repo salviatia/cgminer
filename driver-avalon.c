@@ -123,11 +123,6 @@ static inline void avalon_create_task(struct avalon_task *at,
 	memcpy(at->data, work->data + 64, 12);
 }
 
-static bool avalon_buffer_full(struct cgpu_info *avalon)
-{
-	return avalon_infos[avalon->device_id]->buffer_full;
-}
-
 static bool avalon_write_ready(struct cgpu_info *avalon)
 {
 	return usb_ftdi_ctw(avalon);
@@ -729,12 +724,6 @@ static void avalon_reinit(struct cgpu_info *avalon)
 
 #define FTDI_RS0_CTS    (1 << 4)
 
-/* Set out of lock but it's a simple bool */
-static void set_avalon_cts(struct avalon_info *info, char *buf)
-{
-	info->buffer_full = !(buf[0] & FTDI_RS0_CTS);
-}
-
 static void *avalon_get_results(void *userdata)
 {
 	struct cgpu_info *avalon = (struct cgpu_info *)userdata;
@@ -769,8 +758,8 @@ static void *avalon_get_results(void *userdata)
 
 		if (amount < 3) {
 			if (amount == 2) {
-				set_avalon_cts(info, buf);
-				if (!info->buffer_full)
+				/* Equivalent to avalon_buffer_full */
+				if (!(buf[0] & FTDI_RS0_CTS))
 					pthread_cond_signal(&info->read_cond);
 			}
 			nmsleep(AVALON_READ_TIMEOUT);
@@ -782,7 +771,6 @@ static void *avalon_get_results(void *userdata)
 		/* The first 2 bytes of every 64 is the status */
 		mutex_lock(&info->read_mutex);
 		do {
-			set_avalon_cts(info, &buf[offset - 2]);
 			cp = amount - 2;
 			if (cp > 62)
 				cp = 62;
