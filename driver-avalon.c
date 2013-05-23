@@ -182,9 +182,8 @@ static int avalon_send_task(const struct avalon_task *at,
 	buf[4] = tt;
 #endif
 	info = avalon_infos[avalon->device_id];
-	delay = nr_len * 10 * 1000000ULL;
+	delay = nr_len * 8 * 1000000ULL;
 	delay = delay / info->baud;
-	delay += 4000;
 
 	if (at->reset)
 		nr_len = 1;
