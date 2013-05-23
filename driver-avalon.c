@@ -123,11 +123,22 @@ static inline void avalon_create_task(struct avalon_task *at,
 	memcpy(at->data, work->data + 64, 12);
 }
 
+static bool avalon_write_ready(struct cgpu_info *avalon)
+{
+	return usb_ftdi_ctw(avalon);
+}
+
 /* Wait till the  buffer can accept more writes. The usb status is updated
  * every 40ms. */
 static void avalon_wait_ready(struct cgpu_info *avalon)
 {
-	while (avalon_buffer_full(avalon))
+	while (avalon_buffer_full(avalon) || !avalon_write_ready(avalon))
+		nmsleep(40);
+}
+
+static void avalon_wait_write(struct cgpu_info *avalon)
+{
+	while (!avalon_write_ready(avalon))
 		nmsleep(40);
 }
 
@@ -136,11 +147,9 @@ static int avalon_send_task(const struct avalon_task *at,
 
 {
 	uint8_t buf[AVALON_WRITE_SIZE + 4 * AVALON_DEFAULT_ASIC_NUM];
-	int delay; /* Default 32,000us for B19200 */
+	int delay; /* Default 32ms for B19200 */
 	struct avalon_info *info;
-	struct timeval tv_start;
 	int i, err, amount = 0;
-	char *atb = (char *)at;
 	uint32_t nonce_range;
 	size_t nr_len;
 
@@ -182,7 +191,7 @@ static int avalon_send_task(const struct avalon_task *at,
 	buf[4] = tt;
 #endif
 	info = avalon_infos[avalon->device_id];
-	delay = nr_len * 8 * 1000000ULL;
+	delay = nr_len * 10 * 1000;
 	delay = delay / info->baud;
 
 	if (at->reset)
@@ -192,28 +201,17 @@ static int avalon_send_task(const struct avalon_task *at,
 		hexdump((uint8_t *)buf, nr_len);
 	}
 
-	cgtime(&tv_start);
-	for (i = 0; i < (int)nr_len; i++) {
-		struct timeval now, tdiff;
-		uint64_t expected_us, elapsed_us;
+	avalon_wait_write(avalon);
+	err = usb_write(avalon, (char *)at, (unsigned int)nr_len, &amount,
+			C_AVALON_TASK);
 
-		/* We cannot reliably sleep small times, so jitter our way
-		 * to the expected time. */
-		expected_us = delay * i / nr_len;
-		cgtime(&now);
-		timersub(&now, &tv_start, &tdiff);
-		elapsed_us = tdiff.tv_usec;
-		if (elapsed_us < expected_us)
-			usleep(expected_us - elapsed_us);
+	applog(LOG_DEBUG, "%s%i: usb_write got err %d",
+	       avalon->drv->name, avalon->device_id, err);
+	if (unlikely(err != 0))
+		return AVA_SEND_ERROR;
 
-		err = usb_write(avalon, &atb[i], 1, &amount, C_AVALON_TASK);
-		if (unlikely(err != 0)) {
-			applog(LOG_WARNING, "%s%i: usb_write got err %d",
-			       avalon->drv->name, avalon->device_id, err);
-			return AVA_SEND_ERROR;
-		}
-	}
-
+	delay += 4;
+	nmsleep(delay);
 	applog(LOG_DEBUG, "Avalon: Sent: Buffer delay: %d", delay);
 
 	return AVA_SEND_OK;
