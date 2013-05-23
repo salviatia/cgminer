@@ -146,14 +146,12 @@ static int avalon_send_task(const struct avalon_task *at,
 			    struct cgpu_info *avalon)
 
 {
-	int err;
-	struct timespec p;
 	uint8_t buf[AVALON_WRITE_SIZE + 4 * AVALON_DEFAULT_ASIC_NUM];
-	size_t nr_len;
+	int delay; /* Default 32ms for B19200 */
 	struct avalon_info *info;
-	uint64_t delay = 32000000; /* Default 32ms for B19200 */
+	int i, err, amount = 0;
 	uint32_t nonce_range;
-	int i, amount = 0;
+	size_t nr_len;
 
 	if (at->nonce_elf)
 		nr_len = AVALON_WRITE_SIZE + 4 * at->asic_num;
@@ -193,7 +191,7 @@ static int avalon_send_task(const struct avalon_task *at,
 	buf[4] = tt;
 #endif
 	info = avalon_infos[avalon->device_id];
-	delay = nr_len * 10 * 1000000000ULL;
+	delay = nr_len * 10 * 1000;
 	delay = delay / info->baud;
 
 	if (at->reset)
@@ -212,10 +210,9 @@ static int avalon_send_task(const struct avalon_task *at,
 	if (unlikely(err != 0))
 		return AVA_SEND_ERROR;
 
-	p.tv_sec = 0;
-	p.tv_nsec = (long)delay + 4000000;
-	nanosleep(&p, NULL);
-	applog(LOG_DEBUG, "Avalon: Sent: Buffer delay: %ld", p.tv_nsec);
+	delay += 4;
+	nmsleep(delay);
+	applog(LOG_DEBUG, "Avalon: Sent: Buffer delay: %d", delay);
 
 	return AVA_SEND_OK;
 }
