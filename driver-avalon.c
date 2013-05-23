@@ -215,7 +215,6 @@ static int avalon_send_task(const struct avalon_task *at,
 		}
 	}
 
-	nmsleep(delay);
 	applog(LOG_DEBUG, "Avalon: Sent: Buffer delay: %d", delay);
 
 	return AVA_SEND_OK;
