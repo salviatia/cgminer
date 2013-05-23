@@ -744,10 +744,11 @@ static void *avalon_get_results(void *userdata)
 			mutex_unlock(&info->read_mutex);
 		}
 
+		amount = 0;
 		err = usb_read_once_timeout(avalon, buf, rsize, &amount,
 					    AVALON_READ_TIMEOUT, C_AVALON_READ);
-		if (err) {
-			applog(LOG_DEBUG, "%s%i: Get avalon read got err %d",
+		if (err && err != LIBUSB_ERROR_TIMEOUT) {
+			applog(LOG_WARNING, "%s%i: Get avalon read got err %d",
 			       avalon->drv->name, avalon->device_id, err);
 			nmsleep(AVALON_READ_TIMEOUT);
 			continue;
@@ -759,7 +760,8 @@ static void *avalon_get_results(void *userdata)
 				if (!(buf[0] & FTDI_RS0_CTS))
 					pthread_cond_signal(&info->read_cond);
 			}
-			nmsleep(AVALON_READ_TIMEOUT);
+			if (err != LIBUSB_ERROR_TIMEOUT)
+				nmsleep(AVALON_READ_TIMEOUT);
 			continue;
 		}
 
