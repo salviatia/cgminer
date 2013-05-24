@@ -29,7 +29,7 @@
 #define AVALON_DEFAULT_ASIC_NUM 0xA
 
 #define AVALON_READBUF_SIZE 8192
-#define AVALON_READ_TIMEOUT 8
+#define AVALON_READ_TIMEOUT 5
 
 struct avalon_task {
 	uint8_t reset		:1;
