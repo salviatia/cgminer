@@ -734,8 +734,6 @@ static void *avalon_get_results(void *userdata)
 	mutex_unlock(&info->read_mutex);
 
 	while (42) {
-		struct timeval tv_start, now, tv_diff;
-		uint64_t expected_us, elapsed_us;
 		int amount, err, offset, cp;
 		char buf[rsize];
 
@@ -746,18 +744,13 @@ static void *avalon_get_results(void *userdata)
 			mutex_unlock(&info->read_mutex);
 		}
 
-		cgtime(&tv_start);
-		err = usb_read_once_timeout(avalon, buf, rsize, &amount, 1, C_AVALON_READ);
-		expected_us = amount * 8 * 1000000ull / info->baud;
-		cgtime(&now);
-		timersub(&now, &tv_start, &tv_diff);
-		elapsed_us = tv_diff.tv_usec;
-		if (elapsed_us < expected_us)
-			usleep(expected_us - elapsed_us);
-
+		amount = 0;
+		err = usb_read_once_timeout(avalon, buf, rsize, &amount,
+					    AVALON_READ_TIMEOUT, C_AVALON_READ);
 		if (err && err != LIBUSB_ERROR_TIMEOUT) {
 			applog(LOG_WARNING, "%s%i: Get avalon read got err %d",
 			       avalon->drv->name, avalon->device_id, err);
+			nmsleep(AVALON_READ_TIMEOUT);
 			continue;
 		}
 
@@ -767,6 +760,8 @@ static void *avalon_get_results(void *userdata)
 				if (!(buf[0] & FTDI_RS0_CTS))
 					pthread_cond_signal(&info->read_cond);
 			}
+			if (err != LIBUSB_ERROR_TIMEOUT)
+				nmsleep(AVALON_READ_TIMEOUT);
 			continue;
 		}
 
