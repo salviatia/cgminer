@@ -374,16 +374,24 @@ static void avalon_clear_readbuf(struct cgpu_info *avalon)
 static int avalon_reset(struct cgpu_info *avalon)
 {
 	struct avalon_result ar;
+	struct avalon_task at;
 	uint8_t *buf;
-	int err, i = 0, amount;
+	int ret, i = 0;
 	struct timespec p;
 
 	avalon_wait_ready(avalon);
-	err = usb_write(avalon, "ad", 2, &amount, C_AVALON_RESET);
-	applog(LOG_DEBUG, "%s%i: avalon reset got err %d",
-	       avalon->drv->name, avalon->device_id, err);
-	if (err != 0)
+	avalon_init_task(&at, 1, 0,
+			 AVALON_DEFAULT_FAN_MAX_PWM,
+			 AVALON_DEFAULT_TIMEOUT,
+			 AVALON_DEFAULT_ASIC_NUM,
+			 AVALON_DEFAULT_MINER_NUM,
+			 0, 0,
+			 AVALON_DEFAULT_FREQUENCY);
+	ret = avalon_send_task(&at, avalon);
+	if (unlikely(ret == AVA_SEND_ERROR)) {
+		applog(LOG_ERR, "AVA%i: Reset comms error", avalon->device_id);
 		return 1;
+	}
 
 	avalon_get_reset(avalon, &ar);
 
