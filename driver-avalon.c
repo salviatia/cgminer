@@ -375,11 +375,13 @@ static int avalon_reset(struct cgpu_info *avalon)
 {
 	struct avalon_result ar;
 	uint8_t *buf;
+	char reset;
 	int err, i = 0, amount;
 	struct timespec p;
 
 	avalon_wait_ready(avalon);
-	err = usb_write(avalon, "ad", 2, &amount, C_AVALON_RESET);
+	reset = 0xad;
+	err = usb_write(avalon, &reset, 1, &amount, C_AVALON_RESET);
 	applog(LOG_DEBUG, "%s%i: avalon reset got err %d",
 	       avalon->drv->name, avalon->device_id, err);
 	if (err != 0)
